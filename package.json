@@ -1,0 +1,35 @@
+{
+  "name": "moteurfx-2026",
+  "version": "2.0.0-j3",
+  "private": true,
+  "type": "module",
+  "description": "FX16bit V2 - editeur de sorts procedraux pixel art isometriques",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "render": "tsx src/cli/render.ts",
+    "render:all": "tsx src/cli/render.ts --all --gif --sheet",
+    "dev": "vite --config web/vite.config.ts",
+    "build:web": "vite build --config web/vite.config.ts && node scripts/bundle-single.mjs",
+    "bounds": "tsx src/cli/bounds.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.7.5",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.3",
+    "playwright": "^1.48.2",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vite": "5.4.10",
+    "vitest": "2.1.4"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8"
+  }
+}
