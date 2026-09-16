@@ -75,9 +75,9 @@ paramètre — un réglage visible mais inerte est traité comme un défaut.
 |---|---|
 | Lance de Givre | 1, 2 ou 3 lances tirées en séquence, décalées latéralement |
 | Arc de Rupture | densité de ramification et nombre de relais au sol |
-| Gerbe Ascendante | 1 à 3 conduits tressés qui alimentent la colonne |
+| Météore | 1 à 3 blocs en séquence rapprochée, décalés le long du cap |
 | Lame Déferlante | 1 à 3 lames successives, plus basses et décalées |
-| Éventration | nombre de dalles le long de la même fracture |
+| Marteau de Pierre | 1 à 3 marteaux successifs, échelonnés le long du cap |
 | Spirale de Coupe | nombre d'arcs en orbite |
 
 ## Grammaires élémentaires
@@ -86,7 +86,7 @@ Chaque famille de matière a ses primitives, dans `src/grammar/` :
 
 | Module | Primitives | Utilisé par |
 |---|---|---|
-| `solid.ts` | prismes, pointes, boîtes, faces, fracture, strates, rotation rigide | glace, terre |
+| `solid.ts` | prismes, pointes, blocs rocheux irréguliers, découpe d'un volume en fragments, strates, rotation rigide | glace, terre, feu |
 | `discharge.ts` | déplacement du point médian, réseaux multi-ancres, branches | électricité |
 | `blob.ts` | corps mous harmoniques dans le plan face caméra, vides internes | feu, fumée |
 | `frost.ts` | plaques étoilées, aiguilles de croissance | glace |

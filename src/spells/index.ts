@@ -4,12 +4,12 @@ import type { ElementId } from '../style/palette.js';
 import type { SpellRecipe } from '../sim/types.js';
 import { iceFrostLance } from './iceFrostLance.js';
 import { lightningRuptureArc } from './lightningRuptureArc.js';
-import { fireRisingGout } from './fireRisingGout.js';
+import { fireMeteorStrike } from './fireMeteorStrike.js';
 import { waterBreakingWave } from './waterBreakingWave.js';
-import { earthUpheaval } from './earthUpheaval.js';
+import { earthStoneHammer } from './earthStoneHammer.js';
 import { windCuttingSpiral } from './windCuttingSpiral.js';
 
-export const SPELLS: readonly SpellRecipe[] = [iceFrostLance, lightningRuptureArc, fireRisingGout, waterBreakingWave, earthUpheaval, windCuttingSpiral];
+export const SPELLS: readonly SpellRecipe[] = [iceFrostLance, lightningRuptureArc, fireMeteorStrike, waterBreakingWave, earthStoneHammer, windCuttingSpiral];
 
 export function spellById(id: string): SpellRecipe {
   const found = SPELLS.find((s) => s.id === id);

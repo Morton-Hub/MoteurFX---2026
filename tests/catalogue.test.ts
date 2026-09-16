@@ -138,12 +138,16 @@ describe.each(SPELLS.map((s) => [s.id, s] as const))('recette %s', (_id, recipe)
   });
 
   it('consomme réellement la portée', () => {
-    const near = renderFrame(recipe, 0.5, { heading: 0.3, range: 1.4 });
-    const far = renderFrame(recipe, 0.5, { heading: 0.3, range: 4.2 });
-    const a = near.color.opaqueBounds();
-    const b = far.color.opaqueBounds();
-    expect(a).not.toBeNull();
-    expect(b).not.toBeNull();
-    expect(a).not.toEqual(b);
+    // On échantillonne plusieurs instants : une recette peut légitimement
+    // avoir des phases indépendantes de la portée — un marteau tenu au-dessus
+    // du lanceur occupe la même place quelle que soit la distance de la cible.
+    // Il suffit qu'un instant du clip la révèle.
+    const moments = [0.25, 0.45, 0.65, 0.8];
+    const differing = moments.filter((t) => {
+      const near = renderFrame(recipe, t, { heading: 0.3, range: 1.4 }).color.opaqueBounds();
+      const far = renderFrame(recipe, t, { heading: 0.3, range: 4.2 }).color.opaqueBounds();
+      return JSON.stringify(near) !== JSON.stringify(far);
+    });
+    expect(differing.length).toBeGreaterThan(0);
   });
 });

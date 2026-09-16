@@ -60,6 +60,45 @@ Deux réglages de finition ont suivi, chacun corrigé après inspection :
 Coût mesuré : 4,3 ms par image en moyenne pour le feu, la recette la plus
 chargée du catalogue.
 
+## Refonte du feu et de la terre
+
+Les deux sorts ont été remplacés, pas retouchés. Le diagnostic reposait sur une
+mesure : pour chaque recette, on rend les huit caps, on **recadre chaque image
+sur sa propre silhouette** — sans ce recadrage on ne mesure que la translation,
+pas la forme — puis on compare.
+
+| Recette | La forme change avec le cap |
+|---|---|
+| Arc de Rupture | 75 % |
+| Lance de Givre | 72 % |
+| Lame Déferlante | 50 % |
+| Éventration *(remplacée)* | 48 % |
+| Spirale de Coupe | 26 % |
+| Gerbe Ascendante *(remplacée)* | **9 %** |
+
+À 9 %, la gerbe donnait la même silhouette dans les huit directions : une
+colonne verticale n'existe pas en isométrie, elle serait identique dans un jeu
+vu de côté. Le sort n'était pas non plus un événement mais un phénomène continu,
+sans battement.
+
+L'éventration, elle, était bien directionnelle, mais sans hiérarchie : sept
+dalles équivalentes le long d'une ligne, aucune dominante, le même battement
+répété sept fois, et 30 px d'amplitude verticale seulement.
+
+- **Feu → « Météore ».** Un bloc en fusion entre sur une oblique alignée sur le
+  cap, venant de derrière et au-dessus du lanceur. L'ombre au sol court devant
+  lui et se resserre : le point de chute est lisible avant l'impact. La
+  conséquence est dirigée — fragments en cône orienté par la trajectoire
+  d'arrivée et nappe de feu rasante poussée vers l'avant — et non un anneau
+  concentrique.
+- **Terre → « Marteau de Pierre ».** Une masse unique s'arrache du sol à côté
+  du lanceur, monte à 2,3 tuiles, marque une suspension — c'est ce temps mort
+  qui donne le poids —, puis s'abat en arc sur la cible et éclate. Amplitude
+  verticale portée de 30 à près de 60 px.
+
+Dans les deux cas les fragments sont découpés dans le volume de la masse
+(`shatterVolume`) : ils s'y recollent exactement à l'instant de la rupture.
+
 ## Ce qui fonctionne
 
 - Projection isométrique à ratio configurable, repères locaux, cap libre 360°,
@@ -96,6 +135,9 @@ Versionnées dans `docs/planches/` :
 - `catalogue-sans-lumiere.png` — même planche sans passe lumière ni liseré.
 - `catalogue-silhouettes.png` — silhouettes seules, pour juger les formes.
 - `<sort>.gif` — l'animation complète de chaque sort, cap 0, fond sombre.
+
+Mesure de forme reproductible : voir `docs/architecture.md`, section sur les
+boîtes, pour la raison d'être de `rockLump`.
 
 Régénérables, avec en plus les planches de directions et la variante fond
 clair, par `npm run render:all` puis `npx tsx src/cli/board.ts` — sortie dans

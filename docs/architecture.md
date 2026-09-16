@@ -89,6 +89,20 @@ objet, l'ordre interne des faces étant conservé à un epsilon près. L'objet e
 peint d'un bloc. À utiliser dès qu'une recette pose plusieurs solides convexes
 dans la même scène.
 
+### Une boîte se lit toujours comme une boîte
+
+Deux tentatives successives l'ont montré à l'écran. Un pavé à six faces, même
+avec ses sommets bruités, garde trois directions d'arêtes parallèles que l'œil
+reconstruit immédiatement : le météore ressemblait à un dé, le marteau à un
+carton. Et un éventail de triangles convergeant vers un sommet unique dessine
+un parasol, dont la régularité saute aux yeux.
+
+`rockLump` résout les deux : quatre couronnes bruitées, tronquées par une face
+franche en haut et en bas, décalées latéralement les unes par rapport aux
+autres et roulées différemment, de sorte qu'aucune arête n'en prolonge une
+autre. `shatterVolume` construit ses fragments de la même façon — découpés en
+pavés, ils formaient à l'atterrissage un pavage de tuiles plates.
+
 ### Le dégradé appartient au corps, pas à la primitive
 
 Un dégradé postérisé ancré sur la silhouette de chaque primitive fonctionne

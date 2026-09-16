@@ -5,7 +5,8 @@
  * sa propre normale.
  */
 
-import { type Vec2, type Vec3, add3, cross3, dot3, norm3, scale3, sub3 } from '../core/math.js';
+import { type Vec2, type Vec3, add3, cross3, dot3, len3, norm3, scale3, sub3 } from '../core/math.js';
+import { randSigned } from '../core/rng.js';
 import { cameraDir, depthOf } from '../space/projection.js';
 import type { DrawCmd } from '../render/draw.js';
 import { poly } from '../render/draw.js';
@@ -169,6 +170,12 @@ export type SolidPaint = {
   readonly groupDepth?: number;
   /** Liseré par face : sépare visuellement les éclats d'un même amas. */
   readonly edge?: RGBA;
+  /**
+   * Couleur imposée, qui court-circuite l'ombrage par normale. Sert aux
+   * éléments qui émettent leur propre lumière : une fissure incandescente ne
+   * s'assombrit pas parce que sa face est tournée loin de la lumière.
+   */
+  readonly flatColor?: RGBA;
 };
 
 /** Faces tournees vers la camera, triées du fond vers l'avant. */
@@ -188,7 +195,9 @@ export function emitSolid(ctx: SpellContext, faces: readonly Face[], paint: Soli
   // franchir la distance qui separe deux objets voisins.
   const FACE_STEP = 0.001;
   vis.forEach((f, index) => {
-    const color = shadeFacet(paint.style, paint.palette, f.normal, (f.bias ?? 0) + (paint.bias ?? 0));
+    const color =
+      paint.flatColor ??
+      shadeFacet(paint.style, paint.palette, f.normal, (f.bias ?? 0) + (paint.bias ?? 0));
     const pts: Vec2[] = f.pts.map((p) => ctx.p(p));
     const depth =
       paint.groupDepth === undefined
@@ -261,33 +270,6 @@ export function rotateFacesAbout(
   }));
 }
 
-/** Boite orientee : socle des blocs de terre. */
-export function box(center: Vec3, right: Vec3, forward: Vec3, up: Vec3): Face[] {
-  const r = right;
-  const f = forward;
-  const u = up;
-  const corner = (sr: number, sf: number, su: number): Vec3 => ({
-    x: center.x + r.x * sr + f.x * sf + u.x * su,
-    y: center.y + r.y * sr + f.y * sf + u.y * su,
-    z: center.z + r.z * sr + f.z * sf + u.z * su,
-  });
-  const p000 = corner(-1, -1, -1);
-  const p100 = corner(1, -1, -1);
-  const p110 = corner(1, 1, -1);
-  const p010 = corner(-1, 1, -1);
-  const p001 = corner(-1, -1, 1);
-  const p101 = corner(1, -1, 1);
-  const p111 = corner(1, 1, 1);
-  const p011 = corner(-1, 1, 1);
-  return [
-    makeFace([p001, p101, p111, p011]),
-    makeFace([p000, p010, p110, p100]),
-    makeFace([p000, p100, p101, p001]),
-    makeFace([p110, p010, p011, p111]),
-    makeFace([p100, p110, p111, p101]),
-    makeFace([p010, p000, p001, p011]),
-  ];
-}
 
 /**
  * Strates : bandes fines plaquees sur les faces verticales d'un bloc. Elles
@@ -341,4 +323,116 @@ export function patches(
     centroid: at((u0 + u1) / 2, (v0 + v1) / 2),
     bias,
   }));
+}
+
+
+export type Chunk = {
+  readonly faces: Face[];
+  readonly centre: Vec3;
+  /** Position du morceau dans la grille de decoupe, dans [-1, 1]. */
+  readonly offset: Vec3;
+};
+
+/**
+ * Découpe une masse en morceaux selon une grille régulière.
+ *
+ * Les fragments sont donc réellement **dérivés de l'objet existant** : ils
+ * occupent son volume, héritent de son orientation et de son matériau, et se
+ * recollent exactement à l'instant de la rupture. Remplacer la masse par des
+ * cailloux générés indépendamment donnerait un saut visible au moment du choc.
+ *
+ * Chaque morceau est lui-même un bloc irrégulier : découpés en boîtes, les
+ * fragments formaient à l'atterrissage un pavage de tuiles plates dont toutes
+ * les arêtes restaient parallèles.
+ */
+export function shatterVolume(
+  center: Vec3,
+  right: Vec3,
+  forward: Vec3,
+  up: Vec3,
+  nx: number,
+  ny: number,
+  nz: number,
+  seed: number,
+  roughness = 0.3,
+): Chunk[] {
+  const out: Chunk[] = [];
+  const half = Math.min(len3(right) / nx, len3(forward) / ny, len3(up) / nz);
+  let index = 0;
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      for (let k = 0; k < nz; k++) {
+        const ox = (2 * i + 1) / nx - 1;
+        const oy = (2 * j + 1) / ny - 1;
+        const oz = (2 * k + 1) / nz - 1;
+        const centre = add3(
+          center,
+          add3(scale3(right, ox), add3(scale3(forward, oy), scale3(up, oz))),
+        );
+        out.push({
+          faces: rockLump(centre, half * 1.3, 5, seed + index * 601, 0.9, roughness),
+          centre,
+          offset: { x: ox, y: oy, z: oz },
+        });
+        index++;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Bloc rocheux irrégulier : quatre couronnes bruitées, tronquées en haut et
+ * en bas.
+ *
+ * Deux écueils à éviter, tous deux constatés à l'écran. Une boîte à six faces
+ * se lit toujours comme une boîte : ses trois directions d'arêtes restent
+ * parallèles et l'œil les reconstruit. Et un éventail de triangles convergeant
+ * vers un sommet unique dessine un parasol — la régularité du faisceau est
+ * immédiatement visible.
+ *
+ * D'où la troncature : des faces franches au sommet et à la base, des
+ * couronnes décalées latéralement les unes par rapport aux autres et des
+ * roulis différents, de sorte qu'aucune arête n'en prolonge une autre.
+ *
+ * `squash` < 1 aplatit le bloc, `sides` règle le nombre de facettes par
+ * couronne : 6 donne un éclat anguleux, 9 un galet.
+ */
+export function rockLump(
+  center: Vec3,
+  radius: number,
+  sides: number,
+  seed: number,
+  squash = 1,
+  roughness = 0.34,
+): Face[] {
+  const axis: Vec3 = { x: 0, y: 0, z: 1 };
+  const height = radius * squash;
+  const band = (index: number, z: number, r: number): Vec3[] => {
+    // Chaque couronne dérive un peu sur le côté : le bloc devient bancal.
+    const centre = add3(center, {
+      x: randSigned(seed, index, 88, radius * 0.16),
+      y: randSigned(seed, index, 89, radius * 0.16),
+      z: height * (z + randSigned(seed, index, 90, 0.08)),
+    });
+    return ring(
+      centre,
+      axis,
+      radius * r,
+      sides,
+      randSigned(seed, index, 91, Math.PI),
+      (i) => 1 + randSigned(seed, i + index * 41, 92, roughness),
+    );
+  };
+  const top = band(0, 0.96, 0.36);
+  const upper = band(1, 0.4, 0.88);
+  const lower = band(2, -0.42, 0.8);
+  const bottom = band(3, -0.96, 0.32);
+  return [
+    cap(top),
+    ...bridge(top, upper),
+    ...bridge(upper, lower),
+    ...bridge(lower, bottom),
+    cap([...bottom].reverse(), 0.2),
+  ];
 }
