@@ -243,8 +243,14 @@ export const fireRisingGout: SpellRecipe = {
     }
 
     // ------------------------------------------------------------------
-    // Socle : la flaque en feu. Large, basse, vivante. Elle ancre la colonne
-    // et donne l'échelle, mais ne monte jamais : c'est le flux qui monte.
+    // Socle : une flaque rasante, pas un dôme. Il ancre la colonne au sol et
+    // donne l'échelle, mais ne monte jamais — c'est le flux qui monte.
+    //
+    // Deux écueils à éviter : une calotte haute et régulière se lit comme un
+    // objet distinct posé sous la gerbe ; une nappe large et bruitée se lit
+    // comme une éclaboussure au sol. Le socle doit donc rester **plus étroit
+    // que le pied de la colonne** et peu accidenté : il ferme le bas du flux
+    // sans jamais en dépasser.
     // ------------------------------------------------------------------
     // Dégradé de colonne : il va du pied de la gerbe à son sommet théorique.
     // Toutes les parcelles et le socle s'y réfèrent, donc la couleur d'un
@@ -259,21 +265,21 @@ export const fireRisingGout: SpellRecipe = {
     if (baseLife > 0) {
       const swell = easeOut(ramp(t, T.ignite, T.ignite + 0.14));
       const wane = ramp(t, T.tearStart, T.baseOut);
-      const r = (0.34 + 0.24 * swell) * (1 - wane * 0.62) * flowWidth;
+      const r = (0.3 + 0.16 * swell) * (1 - wane * 0.62) * flowWidth;
       out.push(
         ...emitLobe(
           ctx,
           {
-            center: add3(hit, { x: 0, y: 0, z: r * 0.4 }),
+            center: add3(hit, { x: 0, y: 0, z: r * 0.3 }),
             radius: r,
-            aspect: 0.86,
+            aspect: 0.52,
             lean: 0.04,
-            wobble: 0.26,
+            wobble: 0.2,
             phase: t * 13,
             // Beaucoup de côtés et peu de bruit : le socle doit être une
             // flaque, pas une étoile. L'ancienne version le hérissait de
             // pointes triangulaires qui se lisaient comme des éclats.
-            sides: 17,
+            sides: 15,
             seed: seed + 3,
             taper: 0.08,
           },
@@ -324,7 +330,7 @@ export const fireRisingGout: SpellRecipe = {
 
         // Montée : rapide au départ, elle ralentit à mesure que la parcelle
         // refroidit et s'alourdit.
-        const z = 0.16 + climb * easeOut(k);
+        const z = 0.08 + climb * easeOut(k);
         // La colonne se resserre en montant, et la parcelle s'étire. Les
         // conduits convergent aussi vers l'axe : ils se tressent au lieu de
         // rester parallèles.

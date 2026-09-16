@@ -43,11 +43,14 @@ const DURATION = 1.7;
 const CLIP_OUT = 0.96;
 
 /**
- * Inclinaison que la dalle conserve une fois replantee. Le sol reste donc
- * visiblement eventre jusqu'a ce que la terre se referme, au lieu de revenir
- * a plat et de disparaitre d'un coup.
+ * Inclinaison que la dalle conserve une fois replantee, en radians.
+ * En projection isometrique, une dalle a 24 degres se lit deja comme posee a
+ * plat : il faut nettement plus pour que le sol reste visiblement eventre.
+ * La chute reste lisible parce que les dalles partent de 60 a 86 degres.
  */
-const REST_TILT = 0.42;
+const REST_TILT = 0.7;
+/** Part maximale de l'inclinaison initiale conservee au repos. */
+const REST_SHARE_MAX = 0.6;
 
 const T = {
   stomp: 0.0,
@@ -192,7 +195,7 @@ export const earthUpheaval: SpellRecipe = {
       // reste d'inclinaison qui supprime la disparition brutale — dans la
       // version precedente l'angle repassait sous le seuil de visibilite en
       // deux images, et la dalle s'evaporait sur place.
-      const restShare = Math.min(0.4, REST_TILT / Math.abs(g.tilt));
+      const restShare = Math.min(REST_SHARE_MAX, REST_TILT / Math.abs(g.tilt));
       const settle = window4(t, landAt, landAt + 0.015, landAt + 0.04, landAt + 0.14);
       const angle = g.tilt * (up - down * (1 - restShare)) - settle * 0.06 * Math.sign(g.tilt);
       const emerged = clamp01((Math.abs(angle) - 0.04) / 0.1) * residue;

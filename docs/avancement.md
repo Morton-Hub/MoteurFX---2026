@@ -45,6 +45,18 @@ débit — les dernières parcelles poursuivent leur montée, le socle s'éteint
 elles, un vide s'ouvre. Le dégradé est désormais partagé par toute la colonne,
 sinon les parcelles se lisaient comme une pile de tranches.
 
+Deux réglages de finition ont suivi, chacun corrigé après inspection :
+
+- **Socle du feu.** Il se lisait comme un dôme blanc posé sous la gerbe. Aplati
+  et bruité, il est devenu une éclaboussure en étoile plus large que la colonne
+  — l'excès inverse. Il est désormais tenu **plus étroit que le pied du flux**
+  et peu accidenté : il ferme le bas de la colonne sans jamais en dépasser, et
+  les premières parcelles le recouvrent.
+- **Assise des dalles.** En projection isométrique, une dalle replantée à 24°
+  se lit déjà comme posée à plat. L'inclinaison résiduelle est portée à 0,7 rad
+  (≈ 40°), plafonnée à 60 % de l'inclinaison initiale pour que la chute reste
+  lisible : les dalles partent de 60 à 86° et retombent à 33–40°.
+
 Coût mesuré : 4,3 ms par image en moyenne pour le feu, la recette la plus
 chargée du catalogue.
 
