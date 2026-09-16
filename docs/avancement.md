@@ -23,6 +23,31 @@ reproduire, et chacun fait aujourd'hui l'objet d'un test.
 | Tables anciennes donnant l'illusion de définir des sorts | Un seul chemin : `SPELLS` → `sample()` → `renderFrame` | — |
 | Récits de combos non modélisés | Aucun combo n'est annoncé à ce stade | — |
 
+## Reprise artistique — terre et feu
+
+Trois défauts de la terre étaient des bugs, pas des questions de goût :
+
+| Symptôme | Cause mesurée | Correction |
+|---|---|---|
+| Dalles qui semblent se plier comme du carton | Tri face par face global : une dalle inclinée couvre ~130 unités de profondeur, deux dalles voisines ~25 | `groupDepth` : chaque dalle est peinte comme un objet entier |
+| Faces striées en travers | Les strates suivaient une arête de la face inclinée | Elles sont construites sur le bloc avant bascule, donc dans le lit de sédimentation, et tournent avec lui |
+| Dalles qui s'évaporent sur place | L'angle repassait sous le seuil de visibilité en deux images | Inclinaison résiduelle après retombée, puis la terre se referme (les dalles redescendent dans le sol) |
+
+Plus : épaisseur portée de 0,13–0,22 à 0,24–0,38 tuile, logement sombre au sol
+sous chaque dalle, éclats sur les grandes faces plates.
+
+Le feu, lui, ne bougeait pas : entre t = 0,28 et t = 0,64 la silhouette était
+quasi identique. Le corps était un faisceau de langues ancrées à un point fixe,
+qui rétrécissaient au lieu de monter. Il a été reconstruit en **flux** : des
+parcelles naissent en continu à la base, montent, s'étirent et refroidissent, et
+le déchirement n'est plus un effet ajouté mais la conséquence de la coupure du
+débit — les dernières parcelles poursuivent leur montée, le socle s'éteint sous
+elles, un vide s'ouvre. Le dégradé est désormais partagé par toute la colonne,
+sinon les parcelles se lisaient comme une pile de tranches.
+
+Coût mesuré : 4,3 ms par image en moyenne pour le feu, la recette la plus
+chargée du catalogue.
+
 ## Ce qui fonctionne
 
 - Projection isométrique à ratio configurable, repères locaux, cap libre 360°,

@@ -28,19 +28,26 @@ import {
   window4,
 } from '../core/math.js';
 import { deriveSeed, randRange } from '../core/rng.js';
-import { cameraDir, depthOf } from '../space/projection.js';
+import { depthOf } from '../space/projection.js';
 import type { DrawCmd } from '../render/draw.js';
-import { ellipse } from '../render/draw.js';
+import { ellipse, poly } from '../render/draw.js';
 import { fade } from '../raster/framebuffer.js';
-import { box, emitSolid, rotateFacesAbout, stratify, type Face } from '../grammar/solid.js';
+import { box, emitSolid, patches, rotateFacesAbout, stratify, type Face } from '../grammar/solid.js';
 import { emitDebris } from '../grammar/motion.js';
 import { crackBranches, crackPath, emitCrack, residueAlpha } from '../grammar/ground.js';
 import type { SpellRecipe } from '../sim/types.js';
 
 const DURATION = 1.7;
 
-/** Aucune matiere visible au-dela de cet instant : le clip finit propre. */
+/** Aucune matière visible au-delà de cet instant : le clip finit propre. */
 const CLIP_OUT = 0.96;
+
+/**
+ * Inclinaison que la dalle conserve une fois replantee. Le sol reste donc
+ * visiblement eventre jusqu'a ce que la terre se referme, au lieu de revenir
+ * a plat et de disparaitre d'un coup.
+ */
+const REST_TILT = 0.42;
 
 const T = {
   stomp: 0.0,
@@ -98,8 +105,8 @@ export const earthUpheaval: SpellRecipe = {
   role: 'oneshot',
   duration: DURATION,
   fps: 24,
-  canvas: { width: 256, height: 168 },
-  pivot: { x: 127, y: 94 },
+  canvas: { width: 272, height: 168 },
+  pivot: { x: 135, y: 94 },
   defaultRange: 3.3,
   defaultPower: 0.5,
   radial: false,
@@ -117,7 +124,6 @@ export const earthUpheaval: SpellRecipe = {
     const pal = ctx.palette;
     const style = ctx.style;
     const seed = deriveSeed(ctx.seed, 'earth-upheaval');
-    const view = cameraDir(ctx.projection);
 
     const from = ctx.wl(0.45, 0, 0);
     const to = ctx.wl(ctx.distance, 0, 0);
@@ -156,7 +162,20 @@ export const earthUpheaval: SpellRecipe = {
 
     // ------------------------------------------------------------------
     // Les dalles.
+    //
+    // Chaque dalle est peinte comme un objet entier (`groupDepth`) et non
+    // face par face : une dalle inclinee couvre a elle seule une centaine
+    // d'unites de profondeur, la ou deux dalles voisines n'en separent qu'une
+    // vingtaine. Un tri global face par face les entrelacerait alors qu'elles
+    // ne se croisent jamais.
+    //
+    // Retour au calme : la terre se referme. Les dalles redescendent dans le
+    // sol au lieu de passer d'un coup sous un seuil de visibilite, et le
+    // fondu ne fait que masquer la part qui glisse sous le decor du jeu.
     // ------------------------------------------------------------------
+    const closing = ramp(t, CLIP_OUT - 0.12, CLIP_OUT);
+    const residue = 1 - closing;
+
     for (let i = 0; i < slabs.length; i++) {
       const g = slabs[i]!;
       const riseAt = T.firstRise + g.delay;
@@ -164,24 +183,50 @@ export const earthUpheaval: SpellRecipe = {
       // La derniere dalle doit etre replantee assez tot pour que sa poussiere
       // ait le temps de retomber dans le clip.
       const landAt = Math.min(0.82, fallAt + 0.16);
-      if (t < riseAt) continue;
+      if (t < riseAt || residue <= 0) continue;
 
       // Sortie lente et large, suspension, puis chute acceleree.
       const up = easeOutHeavy(clamp01(ramp(t, riseAt, riseAt + 0.26)));
       const down = easeInHeavy(clamp01(ramp(t, fallAt, landAt)));
-      // Depassement sous le sol a l'atterrissage, resorbe ensuite : la dalle
-      // s'enfonce puis se cale.
+      // La dalle ne revient pas a plat : elle se replante de travers. C'est ce
+      // reste d'inclinaison qui supprime la disparition brutale — dans la
+      // version precedente l'angle repassait sous le seuil de visibilite en
+      // deux images, et la dalle s'evaporait sur place.
+      const restShare = Math.min(0.4, REST_TILT / Math.abs(g.tilt));
       const settle = window4(t, landAt, landAt + 0.015, landAt + 0.04, landAt + 0.14);
-      const angle = g.tilt * (up - down) - settle * 0.07 * Math.sign(g.tilt);
-      // En dessous de ce seuil la dalle est a plat dans le sol : elle n'a pas
-      // de silhouette propre et ne doit pas etre peinte comme un quad pose.
-      const emerged = clamp01((Math.abs(angle) - 0.05) / 0.14);
+      const angle = g.tilt * (up - down * (1 - restShare)) - settle * 0.06 * Math.sign(g.tilt);
+      const emerged = clamp01((Math.abs(angle) - 0.04) / 0.1) * residue;
       if (emerged <= 0) continue;
 
       const anchorGround = add3(
         add3(from, scale3({ x: to.x - from.x, y: to.y - from.y, z: 0 }, g.along)),
         scale3(ctx.frame.side, g.side),
       );
+      const groupDepth = depthOf(anchorGround) + i * 0.02;
+      const sideSign = Math.sign(g.side);
+
+      // Logement : le creux d'ou la dalle est sortie. Sans lui, la dalle a
+      // l'air posee sur le sol plutot que d'en etre arrachee.
+      const socketPts = [
+        add3(anchorGround, scale3(ctx.frame.side, sideSign * g.width)),
+        add3(
+          add3(anchorGround, scale3(ctx.frame.side, sideSign * g.width)),
+          scale3(ctx.frame.forward, g.length),
+        ),
+        add3(
+          add3(anchorGround, scale3(ctx.frame.side, -sideSign * g.width)),
+          scale3(ctx.frame.forward, g.length),
+        ),
+        add3(anchorGround, scale3(ctx.frame.side, -sideSign * g.width)),
+      ].map((q) => ctx.p(q));
+      out.push({
+        layer: 'ground',
+        depth: depthOf(anchorGround) - 2,
+        shape: poly(socketPts),
+        paint: { color: fade(pal.rim, 0.6 * emerged) },
+        tag: 'socket',
+      });
+
       const centre: Vec3 = {
         x: anchorGround.x,
         y: anchorGround.y,
@@ -195,23 +240,36 @@ export const earthUpheaval: SpellRecipe = {
       );
       // Pivot : l'arête arrière de la dalle, côté fracture.
       const hingePoint: Vec3 = {
-        x: anchorGround.x - ctx.frame.side.x * Math.sign(g.side) * g.width,
-        y: anchorGround.y - ctx.frame.side.y * Math.sign(g.side) * g.width,
+        x: anchorGround.x - ctx.frame.side.x * sideSign * g.width,
+        y: anchorGround.y - ctx.frame.side.y * sideSign * g.width,
         z: 0,
       };
-      let tilted = rotateFacesAbout(faces, hingePoint, ctx.frame.forward, angle);
+      // Le meme deplacement s'applique au bloc et a ses details, pour qu'ils
+      // ne se decollent jamais l'un de l'autre.
+      const rotate = (fs: readonly Face[]): Face[] =>
+        rotateFacesAbout(fs, hingePoint, ctx.frame.forward, angle);
+
+      const rotated = rotate(faces);
       // L'arête de charniere reste plantee au sol. Seule l'épaisseur peut
       // passer legerement dessous ; on la corrige pour ne pas peindre un bloc
       // enterre par dessus le decor du jeu, qui ne peut pas l'occulter.
-      const lowest = Math.min(...tilted.flatMap((f) => f.pts.map((q) => q.z)));
-      if (lowest < -0.02) {
-        const lift = -0.02 - lowest;
-        tilted = tilted.map((f) => ({
-          ...f,
-          pts: f.pts.map((q) => ({ x: q.x, y: q.y, z: q.z + lift })),
-          centroid: { ...f.centroid, z: f.centroid.z + lift },
-        }));
-      }
+      const lowest = Math.min(...rotated.flatMap((f) => f.pts.map((q) => q.z)));
+      const lift = lowest < -0.02 ? -0.02 - lowest : 0;
+      const sink =
+        closing > 0
+          ? easeInHeavy(closing) * (g.width * Math.abs(Math.sin(angle)) + g.thickness * 2.5)
+          : 0;
+      const dz = lift - sink;
+      const shift = (fs: readonly Face[]): Face[] =>
+        dz === 0
+          ? [...fs]
+          : fs.map((f) => ({
+              ...f,
+              pts: f.pts.map((q) => ({ x: q.x, y: q.y, z: q.z + dz })),
+              centroid: { ...f.centroid, z: f.centroid.z + dz },
+            }));
+
+      const tilted = shift(rotated);
 
       out.push(
         ...emitSolid(ctx, tilted, {
@@ -220,25 +278,38 @@ export const earthUpheaval: SpellRecipe = {
           alpha: emerged,
           tag: 'slab',
           edge: pal.rim,
-          depthOffset: i * 0.01,
+          groupDepth,
         }),
       );
 
-      // Strates : seulement sur les faces verticales visibles, pour que la
-      // matière se lise sans surcharger la silhouette.
-      for (const f of tilted) {
-        if (Math.abs(f.normal.z) > 0.55) continue;
-        if (f.normal.x * view.x + f.normal.y * view.y + f.normal.z * view.z <= 0.05) continue;
-        out.push(
-          ...emitSolid(ctx, stratify(f, [0.3, 0.64], 0.1), {
-            palette: pal,
-            style,
-            alpha: emerged,
-            tag: 'strata',
-            depthOffset: i * 0.01 + 0.5,
-          }),
-        );
+      // Matière. Les strates sont construites sur le bloc **avant** bascule,
+      // puis tournent avec lui : ce sont des lits de sedimentation, donc des
+      // plans horizontaux a l'origine. Les construire sur la face inclinee
+      // les alignait sur une arête quelconque, et la pierre se lisait comme
+      // du carton ondule.
+      const detailRaw: Face[] = [];
+      for (const f of faces) {
+        if (Math.abs(f.normal.z) > 0.55) {
+          detailRaw.push(
+            ...patches(f, [
+              [0.16, 0.22, 0.37, 0.35],
+              [0.58, 0.55, 0.85, 0.72],
+              [0.44, 0.07, 0.56, 0.18],
+            ]),
+          );
+        } else {
+          detailRaw.push(...stratify(f, [0.34, 0.68], 0.07));
+        }
       }
+      out.push(
+        ...emitSolid(ctx, shift(rotate(detailRaw)), {
+          palette: pal,
+          style,
+          alpha: emerged,
+          tag: 'strata',
+          groupDepth: groupDepth + 0.008,
+        }),
+      );
 
       // Gravats à la sortie et au choc.
       const emergence = clamp01(ramp(t, riseAt, riseAt + 0.12));

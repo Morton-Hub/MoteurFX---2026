@@ -75,6 +75,29 @@ jonctions. Peindre segment par segment mélangerait deux fois sur les
 recouvrements. Chaque commande accumule donc d'abord un masque binaire borné,
 puis mélange une seule fois. Un test le vérifie sur un ruban plié.
 
+### Tri par objet quand les solides se côtoient
+
+`emitSolid` trie les faces d'un solide entre elles, et le renderer trie ensuite
+toutes les commandes globalement. Cela suffit pour un solide isolé, mais pas
+pour une scène qui en contient plusieurs côte à côte : une dalle de terre
+inclinée couvre à elle seule une centaine d'unités de profondeur, là où deux
+dalles voisines n'en séparent qu'une vingtaine. Le tri global entrelaçait donc
+les faces de dalles qui ne se croisent jamais.
+
+`SolidPaint.groupDepth` impose une profondeur commune à toutes les faces d'un
+objet, l'ordre interne des faces étant conservé à un epsilon près. L'objet est
+peint d'un bloc. À utiliser dès qu'une recette pose plusieurs solides convexes
+dans la même scène.
+
+### Le dégradé appartient au corps, pas à la primitive
+
+Un dégradé postérisé ancré sur la silhouette de chaque primitive fonctionne
+pour un objet isolé, et échoue pour un flux : chaque parcelle de flamme portait
+son propre dégradé clair-vers-sombre, et la colonne se lisait comme une pile de
+tranches. Le feu partage donc un dégradé unique, calé sur la hauteur de la
+gerbe : la couleur d'un pixel ne dépend plus que de son altitude dans la
+colonne, et les parcelles se fondent en un seul corps.
+
 ### Seeds dérivées d'un identifiant stable
 
 `deriveSeed(seedProjet, cheminDeNœud)`. Jamais l'index d'un tableau, jamais

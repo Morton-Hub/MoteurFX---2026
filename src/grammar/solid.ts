@@ -154,6 +154,19 @@ export type SolidPaint = {
   readonly dither?: Dither;
   readonly tag?: string;
   readonly depthOffset?: number;
+  /**
+   * Profondeur commune a toutes les faces du solide. A utiliser des qu'une
+   * scene contient plusieurs solides convexes voisins : sans elle, le tri
+   * global face par face entrelace deux objets qui ne se croisent pourtant
+   * jamais. Une dalle de terre inclinee couvre a elle seule une centaine
+   * d'unites de profondeur, la ou deux dalles voisines n'en separent qu'une
+   * vingtaine — l'ordre interne des faces reste correct, mais l'ordre entre
+   * objets devient faux.
+   *
+   * Avec `groupDepth`, l'objet est peint d'un bloc, ses faces conservant leur
+   * ordre relatif a un epsilon pres.
+   */
+  readonly groupDepth?: number;
   /** Liseré par face : sépare visuellement les éclats d'un même amas. */
   readonly edge?: RGBA;
 };
@@ -171,18 +184,25 @@ export function emitSolid(ctx: SpellContext, faces: readonly Face[], paint: Soli
   const vis = visibleFaces(faces, view);
   const alpha = paint.alpha ?? 1;
   const out: DrawCmd[] = [];
-  for (const f of vis) {
+  // Ecart entre deux faces d'un meme objet groupe. Assez petit pour ne jamais
+  // franchir la distance qui separe deux objets voisins.
+  const FACE_STEP = 0.001;
+  vis.forEach((f, index) => {
     const color = shadeFacet(paint.style, paint.palette, f.normal, (f.bias ?? 0) + (paint.bias ?? 0));
     const pts: Vec2[] = f.pts.map((p) => ctx.p(p));
+    const depth =
+      paint.groupDepth === undefined
+        ? depthOf(f.centroid)
+        : paint.groupDepth + index * FACE_STEP;
     out.push({
       layer: paint.layer ?? 'main',
-      depth: depthOf(f.centroid) + (paint.depthOffset ?? 0),
+      depth: depth + (paint.depthOffset ?? 0),
       shape: poly(pts),
       paint: { color: fade(color, alpha), dither: paint.dither },
       ...(paint.edge ? { outline: { color: fade(paint.edge, alpha) } } : {}),
       ...(paint.tag ? { tag: paint.tag } : {}),
     });
-  }
+  });
   return out;
 }
 
@@ -293,4 +313,32 @@ export function stratify(face: Face, fractions: readonly number[], thickness: nu
     });
   }
   return out.map((f) => ({ ...f, centroid: centroid(f.pts) }));
+}
+
+/**
+ * Plaques inserees dans une face quadrilaterale, en coordonnees
+ * parametriques `[u0, v0, u1, v1]` de la face. Sert a poser des eclats et des
+ * cassures sur une grande face plane : sans elles, une face superieure de
+ * dalle est un aplat, et la pierre se lit comme du carton.
+ */
+export function patches(
+  face: Face,
+  rects: readonly (readonly [number, number, number, number])[],
+  bias = 0.3,
+): Face[] {
+  if (face.pts.length !== 4) return [];
+  const [a, b, c, d] = face.pts as [Vec3, Vec3, Vec3, Vec3];
+  // Repere de la face : u le long de a->b, v le long de a->d.
+  const at = (u: number, v: number): Vec3 => ({
+    x: a.x + (b.x - a.x) * u + (d.x - a.x) * v,
+    y: a.y + (b.y - a.y) * u + (d.y - a.y) * v,
+    z: a.z + (b.z - a.z) * u + (d.z - a.z) * v,
+  });
+  void c;
+  return rects.map(([u0, v0, u1, v1]) => ({
+    pts: [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)],
+    normal: face.normal,
+    centroid: at((u0 + u1) / 2, (v0 + v1) / 2),
+    bias,
+  }));
 }

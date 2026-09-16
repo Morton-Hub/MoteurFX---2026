@@ -15,9 +15,9 @@ et un export PNG / GIF / manifeste par ligne de commande.
 |---|---|---|
 | **Lance de Givre** | Glace | Un prisme hexagonal se construit, tient rigide, part d'un bloc, se rompt en fragments facettés |
 | **Arc de Rupture** | Électricité | Cinq décharges de géométrie figée, séparées par du noir, reliées par un fantôme d'ionisation |
-| **Gerbe Ascendante** | Feu | Une gerbe de langues qui gonfle, se déchire et se détache une langue à la fois |
+| **Gerbe Ascendante** | Feu | Un débit continu de parcelles qui montent et refroidissent ; quand le débit se coupe, la colonne se sépare du socle |
 | **Lame Déferlante** | Eau | Une lame pleine dont la lèvre dépasse la base, forme un tube, puis se disloque en gouttes |
-| **Éventration** | Terre | Des dalles stratifiées basculent hors du sol, marquent un temps, et claquent au sol |
+| **Éventration** | Terre | Des dalles stratifiées basculent hors du sol, marquent un temps, claquent au sol, puis la terre se referme |
 | **Spirale de Coupe** | Vent | Des arcs ouverts tournent autour d'un axe vertical, accélèrent, puis fuient par la tangente |
 
 Chaque sort accepte un **cap horizontal arbitraire** et s'exporte en 8, 16 ou N

@@ -75,7 +75,7 @@ paramètre — un réglage visible mais inerte est traité comme un défaut.
 |---|---|
 | Lance de Givre | 1, 2 ou 3 lances tirées en séquence, décalées latéralement |
 | Arc de Rupture | densité de ramification et nombre de relais au sol |
-| Gerbe Ascendante | nombre de langues dans la gerbe |
+| Gerbe Ascendante | 1 à 3 conduits tressés qui alimentent la colonne |
 | Lame Déferlante | 1 à 3 lames successives, plus basses et décalées |
 | Éventration | nombre de dalles le long de la même fracture |
 | Spirale de Coupe | nombre d'arcs en orbite |
