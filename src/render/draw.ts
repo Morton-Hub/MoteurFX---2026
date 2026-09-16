@@ -44,6 +44,23 @@ export type DrawCmd = {
   readonly holes?: readonly Shape[];
   /** Liseré intérieur de la silhouette. */
   readonly outline?: { readonly color: RGBA; readonly dither?: Dither };
+  /**
+   * Matière du corps.
+   *
+   * `solid` reçoit la passe de volume : liseré clair, ombre de contact,
+   * contour. `soft` ne la reçoit pas — appliquer une structure de volume à de
+   * la poussière, de la fumée ou une nappe de flamme les transforme en objets
+   * solides, avec un contour net et une arête éclairée qu'un gaz n'a pas.
+   *
+   * `emissive` est réservé aux corps qui rayonnent — flammes, plasma. Leur
+   * couleur ne vient pas de la lumière extérieure mais de l'épaisseur de
+   * matière : la silhouette réunie est recolorée par sa distance au bord, et
+   * la couleur portée par la commande est ignorée.
+   *
+   * Par défaut `solid`, parce que c'est le cas des corps qui portent la
+   * lecture ; les matières diffuses et lumineuses le déclarent.
+   */
+  readonly material?: 'solid' | 'soft' | 'emissive';
   /** Etiquette de debogage : affichage isole par categorie dans l'editeur. */
   readonly tag?: string;
 };

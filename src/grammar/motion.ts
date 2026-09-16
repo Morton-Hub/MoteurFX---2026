@@ -220,19 +220,24 @@ export function emitDebris(ctx: SpellContext, o: DebrisOptions): DrawCmd[] {
       }
     }
 
-    if (o.shadows && !grounded && ctx.style.groundShadow) {
+    // Seuls les grains assez gros portent une ombre : sous ce calibre elle ne
+    // dit rien de la hauteur et ne fait qu'assombrir le tas.
+    if (o.shadows && size > 1.9 && !grounded && ctx.style.groundShadow) {
       const g = ctx.p({ x: pos.x, y: pos.y, z: groundZ });
       out.push({
         layer: 'ground',
         depth: depthOf({ x: pos.x, y: pos.y, z: groundZ }) - 1,
         shape: ellipse(g, size * 1.1, size * 0.55),
-        paint: { color: fade(o.palette.shadow, alpha * fadeOut * 0.7) },
+        paint: { color: fade(o.palette.shadow, alpha * fadeOut * 0.3) },
         tag: o.tag ? `${o.tag}-shadow` : 'shadow',
       });
     }
 
     out.push({
-      layer: o.kind === 'spark' ? 'main' : 'main',
+      layer: 'main',
+      // Une braise ou une etincelle emet sa propre lumiere : lui donner un
+      // contour sombre et une arête éclairée la transformerait en caillou.
+      material: o.kind === 'ember' || o.kind === 'spark' ? 'soft' : 'solid',
       depth,
       shape,
       paint: { color: fade(color, alpha * fadeOut), dither: o.dither },

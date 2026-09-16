@@ -39,7 +39,6 @@ import { type DrawCmd, ellipse } from '../render/draw.js';
 import { fade } from '../raster/framebuffer.js';
 import {
   emitSolid,
-  patches,
   rockLump,
   rotateFacesAbout,
   shatterVolume,
@@ -165,8 +164,9 @@ export const earthStoneHammer: SpellRecipe = {
             layer: 'ground',
             depth: depthOf(ctx.wl(0.2, 0, 0)) - 1,
             shape: ellipse(ctx.p(ctx.wl(0.2, 0, 0.1)), r, r * ctx.projection.groundRatio * 1.35),
-            paint: { color: fade(pal.glow, stomp * 0.4), dither: { level: 0.5, matrix: 2 } },
-            tag: 'dust',
+            paint: { color: fade(pal.glow, stomp * 0.4), dither: { level: 0.4, matrix: 4 } },
+            material: 'soft',
+      tag: 'dust',
           });
         }
       }
@@ -177,9 +177,12 @@ export const earthStoneHammer: SpellRecipe = {
       // Le creux laissé par l'arrachement. Il reste jusqu'à la fin : la
       // terre garde la trace d'où la masse est sortie.
       // ----------------------------------------------------------------
-      const holeAlpha = residue * clamp01(ramp(t, tearAt, tearAt + 0.06)) * 0.5;
+      // Le creux se lit comme une ombre dans la terre, pas comme un trou noir :
+      // il se superpose à l'ombre portée du bloc, et deux décalques sombres
+      // semi-transparents au même endroit additionnent leurs alphas.
+      const holeAlpha = residue * clamp01(ramp(t, tearAt, tearAt + 0.06)) * 0.32;
       out.push(
-        ...emitPlate(ctx, socket, BLOCK.right * 1.05, 9, blowSeed + 21, pal.rim, holeAlpha, 'socket', 0.34),
+        ...emitPlate(ctx, socket, BLOCK.right * 1.05, 9, blowSeed + 21, pal.ramp[5] ?? pal.rim, holeAlpha, 'socket', 0.34),
       );
 
       // ----------------------------------------------------------------
@@ -222,7 +225,7 @@ export const earthStoneHammer: SpellRecipe = {
       }
 
       if (!broken) {
-        const faces = rockLump(centre, BLOCK_R, 6, blowSeed + 3, BLOCK_SQUASH, 0.3);
+        const faces = rockLump(centre, BLOCK_R, 7, blowSeed + 3, BLOCK_SQUASH, 0.44);
         // Bascule autour de l'axe latéral : le bloc se redresse puis pique.
         const tilted = rotateFacesAbout(faces, centre, ctx.frame.side, pitch);
         // Tant qu'il n'a pas dégagé le sol, on ne peint que ce qui dépasse :
@@ -243,24 +246,16 @@ export const earthStoneHammer: SpellRecipe = {
               // la valeur claire d'une dalle exposée au soleil.
               bias: 0.14,
               tag: 'block',
-              edge: pal.rim,
               groupDepth,
             }),
           );
           // Strates construites sur le bloc non basculé, donc horizontales à
           // l'origine, puis tournées avec lui.
+          // Seules les strates : les éclats plaqués sur les grandes faces se
+          // lisaient comme des trous percés dans la pierre.
           const detail: Face[] = [];
           for (const f of faces) {
-            if (Math.abs(f.normal.z) > 0.55) {
-              detail.push(
-                ...patches(f, [
-                  [0.14, 0.2, 0.38, 0.34],
-                  [0.56, 0.52, 0.86, 0.73],
-                ]),
-              );
-            } else {
-              detail.push(...stratify(f, [0.32, 0.66], 0.08));
-            }
+            if (Math.abs(f.normal.z) <= 0.55) detail.push(...stratify(f, [0.34, 0.68], 0.07));
           }
           out.push(
             ...emitSolid(ctx, rotateFacesAbout(detail, centre, ctx.frame.side, pitch), {
@@ -272,7 +267,7 @@ export const earthStoneHammer: SpellRecipe = {
             }),
           );
           // Ombre au sol : elle suit la position au sol, pas la hauteur.
-          out.push(...groundShadow(ctx, centre, 0.75, 0.35 * emerged));
+          out.push(...groundShadow(ctx, centre, 0.72, 0.2 * emerged));
         }
 
         // Gravats arrachés avec le bloc, qui retombent pendant la montée.
@@ -295,7 +290,6 @@ export const earthStoneHammer: SpellRecipe = {
             style,
             alpha: residue,
             tag: 'gravel',
-            shadows: true,
           }),
         );
         continue;
@@ -351,7 +345,6 @@ export const earthStoneHammer: SpellRecipe = {
               style,
               alpha: shardAlpha,
               tag: 'shard',
-              edge: pal.rim,
               groupDepth: depthOf(c) + j * 0.02,
             }),
           );
@@ -408,8 +401,8 @@ export const earthStoneHammer: SpellRecipe = {
       const puff = window4(t, contactAt, contactAt + 0.04, contactAt + 0.14, puffEnd);
       if (puff > 0) {
         const spread = 0.6 + 1.6 * easeOut(clamp01(age / 0.34));
-        for (let i = 0; i < 5; i++) {
-          const along = (i - 2) / 2;
+        for (let i = 0; i < 3; i++) {
+          const along = i - 1;
           const p = add3(
             add3(impact, scale3(fall, along * spread * 0.75 + spread * 0.25)),
             { x: 0, y: 0, z: 0.16 + 0.12 * spread },
@@ -420,10 +413,11 @@ export const earthStoneHammer: SpellRecipe = {
             depth: depthOf(p) + 0.2,
             shape: ellipse(ctx.p(p), r, r * 0.4),
             paint: {
-              color: fade(pal.ramp[2] ?? pal.glow, puff * 0.5 * residue),
-              dither: { level: 0.45, matrix: 2, phaseX: i * 3, phaseY: i },
+              color: fade(pal.ramp[2] ?? pal.glow, puff * 0.3 * residue),
+              dither: { level: 0.34, matrix: 4, phaseX: i * 3, phaseY: i },
             },
-            tag: 'dust',
+            material: 'soft',
+      tag: 'dust',
           });
         }
       }

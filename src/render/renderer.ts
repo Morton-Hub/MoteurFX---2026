@@ -12,8 +12,9 @@ import { ShapeMask } from '../raster/mask.js';
 import { type DrawCmd, type Layer, cmdBounds, maskForCmd, paintColorAt } from './draw.js';
 import { makeFrame, headingFromTo, localToWorld, project } from '../space/projection.js';
 import type { SpellContext, SpellRecipe } from '../sim/types.js';
-import { PALETTES } from '../style/palette.js';
+import { PALETTES, type Palette } from '../style/palette.js';
 import { DEFAULT_STYLE, type StyleProfile } from '../style/styleProfile.js';
+import { applyEmissive, applyMaterial, lightOnScreen } from './material.js';
 import { ISO_2_1, type ProjectionProfile, withOrigin, withScale } from '../space/projection.js';
 import type { Vec3 } from '../core/math.js';
 
@@ -112,7 +113,14 @@ function sortedLayer(cmds: readonly DrawCmd[], layer: Layer): DrawCmd[] {
     .map((e) => e.cmd);
 }
 
-function paintCmd(fb: Framebuffer, cmd: DrawCmd, style: StyleProfile, silhouette: boolean): void {
+function paintCmd(
+  fb: Framebuffer,
+  cmd: DrawCmd,
+  style: StyleProfile,
+  silhouette: boolean,
+  softMask?: Uint8Array,
+  emissiveMask?: Uint8Array,
+): void {
   const mask = maskForCmd(cmd, fb.width, fb.height);
   if (mask.isEmpty) return;
   const mode = cmd.paint.mode ?? 'over';
@@ -126,6 +134,10 @@ function paintCmd(fb: Framebuffer, cmd: DrawCmd, style: StyleProfile, silhouette
       if (!mask.get(x, y)) continue;
       if (!ditherPasses(dither, x, y)) continue;
       fb.plot(x, y, rowColor, silhouette ? 'over' : mode);
+      // Un solide peint par dessus une matière diffuse reprend ses droits à
+      // la passe de volume ; l'inverse la lui retire.
+      if (softMask) softMask[y * fb.width + x] = cmd.material === 'soft' ? 1 : 0;
+      if (emissiveMask) emissiveMask[y * fb.width + x] = cmd.material === 'emissive' ? 1 : 0;
     }
   }
   if (cmd.outline && !silhouette) {
@@ -140,36 +152,13 @@ function paintCmd(fb: Framebuffer, cmd: DrawCmd, style: StyleProfile, silhouette
   }
 }
 
-/**
- * Liseré extérieur : dilatation d'un pixel de la silhouette déjà peinte.
- * Il s'applique au corps principal, jamais aux décalques de sol ni à la
- * lumière, pour ne pas cerner une ombre.
- */
-function outerRim(fb: Framebuffer, color: RGBA, alpha: number): void {
-  const w = fb.width;
-  const h = fb.height;
-  const filled = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) filled[i] = (fb.data[i * 4 + 3] ?? 0) > 8 ? 1 : 0;
-  const rim: RGBA = [color[0], color[1], color[2], Math.round(255 * clamp01(alpha))];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (filled[y * w + x] === 1) continue;
-      const l = x > 0 ? filled[y * w + x - 1] : 0;
-      const r = x < w - 1 ? filled[y * w + x + 1] : 0;
-      const u = y > 0 ? filled[(y - 1) * w + x] : 0;
-      const d = y < h - 1 ? filled[(y + 1) * w + x] : 0;
-      if (l || r || u || d) fb.plot(x, y, rim, 'over');
-    }
-  }
-}
-
 export function renderCommands(
   cmds: readonly DrawCmd[],
   width: number,
   height: number,
   style: StyleProfile,
   opts: RenderOptions = {},
-  rimColor: RGBA = PALETTES.ice.rim,
+  palette: Palette = PALETTES.ice,
 ): RenderResult {
   const visible = filterCmds(cmds, opts);
   const color = new Framebuffer(width, height);
@@ -179,9 +168,38 @@ export function renderCommands(
   for (const cmd of sortedLayer(visible, 'ground')) paintCmd(color, cmd, style, silhouette);
 
   const body = new Framebuffer(width, height);
-  for (const cmd of sortedLayer(visible, 'main')) paintCmd(body, cmd, style, silhouette);
-  if (style.outline === 'rim' && !silhouette) {
-    outerRim(body, rimColor, style.outlineAlpha);
+  const softMask = new Uint8Array(width * height);
+  const emissiveMask = new Uint8Array(width * height);
+  for (const cmd of sortedLayer(visible, 'main')) {
+    paintCmd(body, cmd, style, silhouette, softMask, emissiveMask);
+  }
+  if (!silhouette) {
+    // Les corps rayonnants sont recolorés par leur épaisseur, avant la passe
+    // de volume, qui les ignore ensuite.
+    let hasEmissive = false;
+    for (let i = 0; i < emissiveMask.length; i++) {
+      if (emissiveMask[i] === 1) {
+        hasEmissive = true;
+        break;
+      }
+    }
+    if (hasEmissive) {
+      applyEmissive(body, emissiveMask, palette, style.emissiveCore, style.outlineAlpha);
+      for (let i = 0; i < emissiveMask.length; i++) {
+        if (emissiveMask[i] === 1) softMask[i] = 1;
+      }
+    }
+  }
+  if (!silhouette) {
+    // Structure lumineuse : liseré clair, ombre de contact, contour sélectif.
+    // Sans elle, les faces projetées restent des aplats et l'on voit le
+    // maillage au lieu d'un volume.
+    applyMaterial(body, {
+      palette,
+      style,
+      light: lightOnScreen(opts.projection ?? ISO_2_1, style.lightDir),
+      soft: softMask,
+    });
   }
   color.composite(body, 'over');
 
@@ -211,7 +229,7 @@ export function renderFrame(
     recipe.canvas.height,
     style,
     opts,
-    ctx.palette.rim,
+    ctx.palette,
   );
 }
 

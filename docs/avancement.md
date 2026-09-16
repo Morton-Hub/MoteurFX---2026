@@ -99,6 +99,31 @@ répété sept fois, et 30 px d'amplitude verticale seulement.
 Dans les deux cas les fragments sont découpés dans le volume de la masse
 (`shatterVolume`) : ils s'y recollent exactement à l'instant de la rupture.
 
+## Passe de matière, et le feu repris
+
+Le rendu restait du low-poly à plat : le maillage visible — chaque face portant
+son propre contour —, aucune structure de lumière, des aplats séparés par des
+traits. Une passe de matière en espace écran corrige cela pour tout le
+catalogue d'un coup : liseré clair interrompu, ombre de contact, contour
+sélectif ; contours par face supprimés ; extrêmes de la rampe réservés aux
+arêtes.
+
+Le feu demandait autre chose : appliqué à une flamme, ce traitement en fait un
+caillou. La passe **émissive** colore la silhouette réunie par son épaisseur,
+si bien que des lobes qui se recouvrent fusionnent en une masse au lieu de
+rester un empilement d'objets orange. Le sort est devenu une **Boule de Feu** :
+les flammes se rassemblent dans la main, la masse part avec une traînée, puis
+éclate.
+
+Trois pièges rencontrés en chemin, tous corrigés :
+
+- des **décalques semi-transparents superposés** additionnent leurs alphas —
+  quatorze ombres de gravats au même endroit faisaient une flaque noire ;
+- une **valeur d'épaisseur globale** ne peut pas servir une mèche de dix pixels
+  et une explosion de quarante : la rampe est normalisée par corps ;
+- **tramer l'opacité d'un corps émissif** le troue, la mesure d'épaisseur
+  s'effondre et l'explosion finit en treillis rouge.
+
 ## Ce qui fonctionne
 
 - Projection isométrique à ratio configurable, repères locaux, cap libre 360°,

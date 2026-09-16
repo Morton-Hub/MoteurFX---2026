@@ -143,7 +143,6 @@ export const iceFrostLance: SpellRecipe = {
           style,
           alpha: life,
           tag: 'needle',
-          edge: pal.rim,
         }),
       );
     }
@@ -180,7 +179,6 @@ export const iceFrostLance: SpellRecipe = {
             palette: pal,
             style,
             tag: 'lance',
-            edge: pal.rim,
           }),
         );
 
@@ -269,7 +267,6 @@ export const iceFrostLance: SpellRecipe = {
               style,
               alpha,
               tag: 'shard',
-              edge: pal.rim,
             }),
           );
         }
@@ -342,7 +339,6 @@ export const iceFrostLance: SpellRecipe = {
             style,
             alpha: life,
             tag: 'needle',
-            edge: pal.rim,
           }),
         );
       }

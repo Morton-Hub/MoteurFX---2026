@@ -126,14 +126,20 @@ describe.each(SPELLS.map((s) => [s.id, s] as const))('recette %s', (_id, recipe)
 
   it('consomme réellement le rang', () => {
     // Un paramètre présent dans le contrat mais ignoré par la recette est un
-    // faux réglage. On compare les pixels et non le nombre de commandes : un
-    // rang peut légitimement changer la forme sans changer le décompte.
-    const low = renderFrame(recipe, 0.55, { heading: 0.3, power: 0 }).color;
-    const high = renderFrame(recipe, 0.55, { heading: 0.3, power: 1 }).color;
-    let differing = 0;
-    for (let i = 0; i < low.data.length; i += 4) {
-      if (low.data[i + 3] !== high.data[i + 3] || low.data[i] !== high.data[i]) differing++;
-    }
+    // faux réglage. On compare les pixels et non le nombre de commandes — un
+    // rang peut changer la forme sans changer le décompte — et on échantillonne
+    // plusieurs instants, car une phase entière peut légitimement ne pas en
+    // dépendre : un projectile en vol est le même quel que soit le rang.
+    const moments = [0.2, 0.4, 0.6, 0.75];
+    const differing = moments.reduce((total, t) => {
+      const low = renderFrame(recipe, t, { heading: 0.3, power: 0 }).color;
+      const high = renderFrame(recipe, t, { heading: 0.3, power: 1 }).color;
+      let n = 0;
+      for (let i = 0; i < low.data.length; i += 4) {
+        if (low.data[i + 3] !== high.data[i + 3] || low.data[i] !== high.data[i]) n++;
+      }
+      return total + n;
+    }, 0);
     expect(differing).toBeGreaterThan(0);
   });
 

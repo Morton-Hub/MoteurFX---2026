@@ -75,7 +75,7 @@ paramètre — un réglage visible mais inerte est traité comme un défaut.
 |---|---|
 | Lance de Givre | 1, 2 ou 3 lances tirées en séquence, décalées latéralement |
 | Arc de Rupture | densité de ramification et nombre de relais au sol |
-| Météore | 1 à 3 blocs en séquence rapprochée, décalés le long du cap |
+| Boule de Feu | densité de la charge et largeur de l'explosion |
 | Lame Déferlante | 1 à 3 lames successives, plus basses et décalées |
 | Marteau de Pierre | 1 à 3 marteaux successifs, échelonnés le long du cap |
 | Spirale de Coupe | nombre d'arcs en orbite |

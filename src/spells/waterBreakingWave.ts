@@ -201,6 +201,7 @@ function emitLame(ctx: SpellContext, shape: WaveShape, alpha: number, withGlow: 
         color: fade(pal.accent, alpha * clamp01(shape.lip * 2.2)),
         dither: { level: 0.75, matrix: 2 },
       },
+      material: 'soft',
       tag: 'foam',
     });
   }

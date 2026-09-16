@@ -15,7 +15,7 @@ et un export PNG / GIF / manifeste par ligne de commande.
 |---|---|---|
 | **Lance de Givre** | Glace | Un prisme hexagonal se construit, tient rigide, part d'un bloc, se rompt en fragments facettés |
 | **Arc de Rupture** | Électricité | Cinq décharges de géométrie figée, séparées par du noir, reliées par un fantôme d'ionisation |
-| **Météore** | Feu | Un bloc en fusion entre en oblique dans l'axe du cap, s'écrase sur la cible et pousse devant lui une nappe de feu rasante |
+| **Boule de Feu** | Feu | Les flammes se rassemblent dans la main, la masse part en laissant une traînée, puis éclate en s'ouvrant large avant de se déchirer en langues |
 | **Lame Déferlante** | Eau | Une lame pleine dont la lèvre dépasse la base, forme un tube, puis se disloque en gouttes |
 | **Marteau de Pierre** | Terre | Une masse s'arrache du sol, monte, marque une suspension lourde, puis s'abat en arc sur la cible et éclate |
 | **Spirale de Coupe** | Vent | Des arcs ouverts tournent autour d'un axe vertical, accélèrent, puis fuient par la tangente |

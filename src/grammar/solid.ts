@@ -168,8 +168,6 @@ export type SolidPaint = {
    * ordre relatif a un epsilon pres.
    */
   readonly groupDepth?: number;
-  /** Liseré par face : sépare visuellement les éclats d'un même amas. */
-  readonly edge?: RGBA;
   /**
    * Couleur imposée, qui court-circuite l'ombrage par normale. Sert aux
    * éléments qui émettent leur propre lumière : une fissure incandescente ne
@@ -208,7 +206,6 @@ export function emitSolid(ctx: SpellContext, faces: readonly Face[], paint: Soli
       depth: depth + (paint.depthOffset ?? 0),
       shape: poly(pts),
       paint: { color: fade(color, alpha), dither: paint.dither },
-      ...(paint.edge ? { outline: { color: fade(paint.edge, alpha) } } : {}),
       ...(paint.tag ? { tag: paint.tag } : {}),
     });
   });
@@ -411,8 +408,8 @@ export function rockLump(
   const band = (index: number, z: number, r: number): Vec3[] => {
     // Chaque couronne dérive un peu sur le côté : le bloc devient bancal.
     const centre = add3(center, {
-      x: randSigned(seed, index, 88, radius * 0.16),
-      y: randSigned(seed, index, 89, radius * 0.16),
+      x: randSigned(seed, index, 88, radius * 0.24),
+      y: randSigned(seed, index, 89, radius * 0.24),
       z: height * (z + randSigned(seed, index, 90, 0.08)),
     });
     return ring(
@@ -424,10 +421,10 @@ export function rockLump(
       (i) => 1 + randSigned(seed, i + index * 41, 92, roughness),
     );
   };
-  const top = band(0, 0.96, 0.36);
+  const top = band(0, 0.96, 0.26);
   const upper = band(1, 0.4, 0.88);
   const lower = band(2, -0.42, 0.8);
-  const bottom = band(3, -0.96, 0.32);
+  const bottom = band(3, -0.96, 0.24);
   return [
     cap(top),
     ...bridge(top, upper),

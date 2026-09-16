@@ -89,6 +89,50 @@ objet, l'ordre interne des faces étant conservé à un epsilon près. L'objet e
 peint d'un bloc. À utiliser dès qu'une recette pose plusieurs solides convexes
 dans la même scène.
 
+### Le rastériseur ne suffit pas : il faut une passe de matière
+
+Des faces planes projetées, livrées telles quelles, donnent du **low-poly à
+plat** : on voit le maillage, les aplats se touchent sans transition, et rien
+ne dit où est le volume. C'est la différence entre un rendu 3D en basse
+résolution et du pixel art.
+
+`render/material.ts` travaille donc sur la silhouette déjà peinte, en espace
+écran, et lui rend les trois choses qui font lire un volume :
+
+1. un **liseré clair** sur les bords tournés vers la lumière — interrompu, pas
+   continu : un seuil trop bas allume toute la moitié supérieure d'un trait
+   uniforme qui se lit comme une bordure dorée ;
+2. une **ombre de contact** sur les bords opposés, à l'intérieur ;
+3. un **contour sélectif** à l'extérieur, franc du côté sombre et atténué du
+   côté éclairé.
+
+Deux conséquences dans le reste du moteur. Les contours **par face** ont
+disparu : ils exposaient le maillage. Et `StyleProfile.facetRange` réserve les
+extrêmes de la rampe aux arêtes — une face entière qui atteint le noir
+transforme le corps en silhouette.
+
+### Un feu ne s'ombre pas, il rayonne
+
+La même passe appliquée à une flamme la transforme en caillou. Une flamme
+n'est pas éclairée de l'extérieur : sa valeur dépend de son **épaisseur de
+matière**, bord sombre et cœur blanc.
+
+`applyEmissive` prend donc la silhouette **réunie** de tout ce qui brûle,
+mesure en chaque pixel sa distance au bord, et en déduit la couleur. Deux
+lobes qui se recouvrent fusionnent alors en un corps plus épais, donc plus
+chaud en son milieu — au lieu de rester deux objets orange empilés, ce qui
+donnait un « amas de briques ». La rampe est normalisée par corps, en
+8-connexité : une constante globale ne peut pas servir à la fois une mèche de
+dix pixels et une explosion de quarante.
+
+Corollaire : un corps émissif ne se fond pas par tramage. Trouer sa silhouette
+fait mesurer à la passe l'épaisseur d'un grillage, et toute la masse retombe
+sur les échelons sombres. Il s'éteint en rétrécissant.
+
+Chaque commande déclare donc sa matière — `solid`, `soft` ou `emissive` — et
+`soft` existe pour la même raison : appliquer une structure de volume à de la
+poussière ou de la fumée en fait des objets solides.
+
 ### Une boîte se lit toujours comme une boîte
 
 Deux tentatives successives l'ont montré à l'écran. Un pavé à six faces, même

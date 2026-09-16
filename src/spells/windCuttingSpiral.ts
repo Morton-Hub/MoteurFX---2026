@@ -110,6 +110,8 @@ function emitArc(
     const mid: Vec3 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
     out.push({
       layer: 'main',
+      // Un arc de vent est de l'air : ni liseré de volume, ni contour franc.
+      material: 'soft',
       depth: depthOf(mid),
       shape: { t: 'ribbon', pts: [ctx.p(a), ctx.p(b)], widths: [wa, wb] },
       paint: {
@@ -273,6 +275,7 @@ export const windCuttingSpiral: SpellRecipe = {
             width: 1,
           },
           paint: { color: fade(i % 4 === 0 ? pal.accent : pal.ramp[2] ?? pal.core, orbiting * 0.9) },
+          material: 'soft',
           tag: 'leaf',
         });
       }
