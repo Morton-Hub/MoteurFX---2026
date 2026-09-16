@@ -37,6 +37,14 @@ export type StyleProfile = {
    * retrouver avec un cœur blanc.
    */
   readonly emissiveCore: number;
+  /** Opacite du contour d'un corps emissif. 0 = aucun, cas d'une flamme. */
+  readonly emissiveOutline: number;
+  /** Poids de l'epaisseur dans la valeur d'un corps emissif. */
+  readonly emissiveEdgeBias: number;
+  /** Poids de la moucheture dans la valeur d'un corps emissif. */
+  readonly emissiveTurbulence: number;
+  /** Exposant de la moucheture : regle la part de la valeur la plus claire. */
+  readonly emissiveTurbulenceBias: number;
   /** Passe lumière additive. Le sujet doit rester lisible sans elle. */
   readonly glow: boolean;
   readonly glowAlpha: number;
@@ -53,6 +61,10 @@ export const DEFAULT_STYLE: StyleProfile = {
   contrast: 1.6,
   facetRange: [0.06, 0.74],
   emissiveCore: 3,
+  emissiveOutline: 0,
+  emissiveEdgeBias: 0,
+  emissiveTurbulence: 0.92,
+  emissiveTurbulenceBias: 2.6,
   outline: 'rim',
   outlineAlpha: 0.85,
   glow: true,

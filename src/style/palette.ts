@@ -55,14 +55,27 @@ export const PALETTES: Readonly<Record<ElementId, Palette>> = {
   },
   fire: {
     id: 'fire',
-    ramp: [c('FFF6D2'), c('FFD35C'), c('FF9A26'), c('EE5A12'), c('B22A0E'), c('6E1710')],
-    core: c('FFFFFF'),
-    accent: c('FFE9A0'),
+    /**
+     * Quatre valeurs, toutes saturées, aucune sombre.
+     *
+     * Une flamme de pixel art ne descend pas vers le brun ni vers le noir :
+     * elle vit entre le jaune et le rouge, et c'est le **fond** qui fait le
+     * contraste. La rampe précédente allait du blanc cassé au brun profond,
+     * si bien que la moitié de la masse tombait dans des valeurs éteintes et
+     * que le bord se lisait comme une croûte.
+     *
+     * Le jaune est majoritaire ; l'orange et le rouge sont des accents.
+     */
+    ramp: [c('FFE45E'), c('FFB227'), c('FF6E12'), c('E23C06')],
+    core: c('FFFDE8'),
+    accent: c('FFF2A8'),
+    /** Réservé aux brûlures au sol : jamais au contour d'une flamme. */
     rim: c('2A0C0A'),
     glow: c('FF9A2E'),
     ground: c('C4571C'),
     shadow: c('2A0C0A', 70),
-    debris: c('4A3A38'),
+    /** Fumée : la seule matière froide de l'élément. */
+    debris: c('55433E'),
   },
   water: {
     id: 'water',

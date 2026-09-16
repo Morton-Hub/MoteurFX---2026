@@ -124,6 +124,13 @@ Trois pièges rencontrés en chemin, tous corrigés :
 - **tramer l'opacité d'un corps émissif** le troue, la mesure d'épaisseur
   s'effondre et l'explosion finit en treillis rouge.
 
+Une référence de pixel art fournie en cours de route a recalé la direction
+artistique du feu : quatre valeurs saturées sans aucune sombre, aucun contour,
+et une matière **mouchetée** plutôt que des anneaux concentriques. Le réglage
+a été conduit à la mesure — on compte la proportion de chaque valeur dans le
+corps de la flamme — et non à l'œil : trois tentatives successives donnaient
+7 %, 13 % puis 21 % de jaune là où il en fallait environ 55 %.
+
 ## Ce qui fonctionne
 
 - Projection isométrique à ratio configurable, repères locaux, cap libre 360°,

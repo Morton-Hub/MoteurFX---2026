@@ -256,7 +256,7 @@ export const fireBall: SpellRecipe = {
       // leur rotation les uns par rapport aux autres, pas d'un bruit global.
       for (let i = 0; i < 3; i++) {
         const spin = t * 26 + (i * Math.PI * 2) / 3;
-        const off = 0.17;
+        const off = 0.14;
         const centre = add3(head, {
           x: Math.cos(spin) * off,
           y: Math.sin(spin) * off * 0.6,
@@ -267,8 +267,8 @@ export const fireBall: SpellRecipe = {
             ctx,
             {
               center: centre,
-              radius: 0.42 + 0.07 * Math.sin(spin * 2),
-              aspect: 1.12,
+              radius: 0.6 + 0.07 * Math.sin(spin * 2),
+              aspect: 1.02,
               lean: 0.08,
               wobble: 0.3,
               phase: t * 24 + i * 2.1,
@@ -489,7 +489,7 @@ export const fireBall: SpellRecipe = {
         depth: depthOf(centre) - 2,
         shape: poly(pts.map((p) => ctx.p(p))),
         paint: {
-          color: fade(pal.ramp[5] ?? pal.rim, (1 - k) * 0.55 * (1 - ramp(t, CLIP_OUT - 0.1, CLIP_OUT))),
+          color: fade(pal.debris, (1 - k) * 0.55 * (1 - ramp(t, CLIP_OUT - 0.1, CLIP_OUT))),
           dither: { level: 0.6 - k * 0.3, matrix: 4 },
         },
         tag: 'smoke',

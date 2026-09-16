@@ -125,6 +125,31 @@ donnait un « amas de briques ». La rampe est normalisée par corps, en
 8-connexité : une constante globale ne peut pas servir à la fois une mèche de
 dix pixels et une explosion de quarante.
 
+La couleur, elle, ne vient **pas** d'un dégradé concentrique. Une flamme
+dessinée à la main est mouchetée : des amas d'orange et de rouge dispersés
+dans un champ majoritairement jaune. L'épaisseur n'incline donc la valeur que
+sur la frange extérieure — appliquée linéairement, elle décale toute la masse
+d'un échelon, la moyenne de `1 - t` sur un disque valant déjà un tiers — et
+c'est un bruit par cellules qui porte le reste, remonté par un exposant qui
+décide de la part de jaune.
+
+Trois détails comptent, chacun mesuré plutôt que jugé à l'œil (les proportions
+visées sont celles d'une référence de pixel art : environ 55 % de jaune, 25 %
+d'orange, 12 % d'orange foncé, 7 % de rouge) :
+
+- **pas de tramage entre échelons.** Il ajoute un grain parasite et déplace la
+  moitié des pixels de la valeur claire vers la suivante : la masse vire à
+  l'orange quel que soit le réglage ;
+- **pas de moyenne de deux bruits d'égal poids.** Elle resserre la
+  distribution autour de 0,5, donc tous les pixels tombent sur le même
+  échelon. Les gros amas décident, le détail ne fait que froisser leur bord ;
+- **pas de contour.** Un feu se détache par sa propre clarté ; un trait sombre
+  autour en fait un objet découpé.
+
+La rampe du feu a suivi : quatre valeurs saturées du jaune au rouge, aucune
+sombre. La précédente allait du blanc cassé au brun profond, si bien que la
+moitié de la masse tombait dans des valeurs éteintes.
+
 Corollaire : un corps émissif ne se fond pas par tramage. Trouer sa silhouette
 fait mesurer à la passe l'épaisseur d'un grillage, et toute la masse retombe
 sur les échelons sombres. Il s'éteint en rétrécissant.

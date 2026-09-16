@@ -19,8 +19,9 @@
  */
 
 import type { Vec2, Vec3 } from '../core/math.js';
-import { Framebuffer, type RGBA, bayer4, mixColor } from '../raster/framebuffer.js';
+import { Framebuffer, type RGBA, mixColor } from '../raster/framebuffer.js';
 import type { ProjectionProfile } from '../space/projection.js';
+import { randN } from '../core/rng.js';
 import type { Palette } from '../style/palette.js';
 import { rampAt } from '../style/palette.js';
 import type { StyleProfile } from '../style/styleProfile.js';
@@ -185,12 +186,56 @@ export function applyMaterial(fb: Framebuffer, o: MaterialOptions): void {
  * Les transitions entre échelons sont tramées, ce qui évite les anneaux trop
  * réguliers tout en gardant des valeurs franches.
  */
+export type EmissiveOptions = {
+  /** Épaisseur minimale pour parcourir toute la rampe. */
+  readonly coreDistance: number;
+  /** Opacité du contour. 0 = aucun, ce qui est le cas d'une flamme. */
+  readonly rimAlpha: number;
+  /**
+   * Poids de l'épaisseur dans le choix de la valeur.
+   *
+   * Seule, elle produit des anneaux concentriques réguliers — une cible, pas
+   * un feu. Dans un feu dessiné à la main, le bord est à peine plus chaud que
+   * le cœur : ce sont les **amas** d'orange et de rouge dispersés dans la
+   * masse qui font la matière.
+   */
+  readonly edgeBias: number;
+  /** Poids de la moucheture. */
+  readonly turbulence: number;
+  /**
+   * Exposant appliqué à la moucheture. Au-dessus de 1 il tire la distribution
+   * vers le clair : c'est lui qui décide de la proportion de jaune, et donc de
+   * la lecture d'ensemble. Un bruit uniforme donne une masse orange homogène.
+   */
+  readonly turbulenceBias: number;
+  /**
+   * Décalage vertical de la moucheture, en pixels. Il avance avec le temps,
+   * si bien que la texture **monte** au lieu de grésiller sur place.
+   */
+  readonly phase: number;
+  readonly seed: number;
+};
+
+/**
+ * Bruit par cellules, échantillonné au plus proche : des amas francs.
+ *
+ * Les gros amas décident seuls de la valeur ; le détail ne fait que froisser
+ * leur bord. Moyenner deux bruits d'égal poids resserrerait la distribution
+ * autour de 0,5 — tous les pixels tomberaient alors sur le même échelon de
+ * rampe, et la masse virerait à l'orange uniforme quel que soit le réglage.
+ */
+function mottle(x: number, y: number, phase: number, seed: number): number {
+  const coarse = randN(seed, Math.floor(x / 5) * 73 + Math.floor((y + phase) / 5), 1);
+  const detail = randN(seed + 977, Math.floor(x / 2) * 73 + Math.floor((y + phase * 1.6) / 2), 2);
+  const v = coarse + (detail - 0.5) * 0.35;
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 export function applyEmissive(
   fb: Framebuffer,
   mask: Uint8Array,
   palette: Palette,
-  coreDistance: number,
-  rimAlpha: number,
+  o: EmissiveOptions,
 ): void {
   const w = fb.width;
   const h = fb.height;
@@ -280,14 +325,27 @@ export function applyEmissive(
       const i = y * w + x;
       if (mask[i] !== 1) continue;
       // 0 au bord, 1 au cœur du corps auquel ce pixel appartient.
-      const span = Math.max(coreDistance, peak[label[i]!] ?? 1);
+      const span = Math.max(o.coreDistance, peak[label[i]!] ?? 1);
       const t = Math.min(1, (dist[i] ?? 0) / span);
-      const level = (1 - t) * (steps - 1);
-      const idx = Math.floor(level);
-      const frac = level - idx;
-      // Tramage de la transition : des bandes franches sans marches nettes.
-      const bump = bayer4(x, y) < frac ? 1 : 0;
-      const color = palette.ramp[Math.min(steps - 1, idx + bump)] ?? palette.core;
+      // L'épaisseur ne fait qu'incliner la valeur ; la moucheture porte le
+      // reste. Sans elle on obtient des anneaux, avec elle un feu.
+      // La moucheture est élevée à une puissance > 1 pour tirer la
+      // distribution vers le clair : dans un feu dessiné, le jaune couvre la
+      // majorité de la surface et l'orange comme le rouge ne sont que des
+      // accents. Un bruit uniforme donnerait une masse orange homogène.
+      const n = Math.pow(mottle(x, y, o.phase, o.seed), o.turbulenceBias);
+      // L'épaisseur n'agit que sur la frange extérieure : au cube, son effet
+      // s'éteint dès qu'on rentre dans le corps. Appliquée linéairement, elle
+      // décalait toute la masse d'un échelon — la moyenne de (1 - t) sur un
+      // disque vaut déjà un tiers — et le jaune disparaissait.
+      const v = Math.min(1, Math.pow(1 - t, 3) * o.edgeBias + n * o.turbulence);
+      // Quantification franche, sans tramage : les amas viennent de la
+      // moucheture elle-même. Tramer la transition entre deux échelons ajoute
+      // un grain parasite et, surtout, déplace la moitié des pixels de la
+      // valeur claire vers la suivante — la masse vire à l'orange alors qu'un
+      // feu dessiné est majoritairement jaune.
+      const idx = Math.min(steps - 1, Math.round(v * (steps - 1)));
+      const color = palette.ramp[idx] ?? palette.core;
       const alpha = fb.data[i * 4 + 3] ?? 255;
       fb.data[i * 4] = color[0];
       fb.data[i * 4 + 1] = color[1];
@@ -296,9 +354,10 @@ export function applyEmissive(
     }
   }
 
-  // Contour : un feu se détache toujours de son fond par un trait sombre.
-  if (rimAlpha <= 0) return;
-  const rim: RGBA = [palette.rim[0], palette.rim[1], palette.rim[2], Math.round(255 * rimAlpha)];
+  // Contour optionnel. Une flamme n'en a pas : elle se détache par sa propre
+  // clarté, et un trait sombre autour la transforme en objet découpé.
+  if (o.rimAlpha <= 0) return;
+  const rim: RGBA = [palette.rim[0], palette.rim[1], palette.rim[2], Math.round(255 * o.rimAlpha)];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;

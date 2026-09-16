@@ -35,6 +35,11 @@ export type RenderOptions = {
   readonly onlyTags?: readonly string[];
   /** Rendu de la seule silhouette, en blanc. Controle de lisibilité. */
   readonly silhouetteOnly?: boolean;
+  /**
+   * Instant du clip, en secondes. Sert aux textures qui doivent avancer dans
+   * le temps, comme la moucheture d'un corps émissif.
+   */
+  readonly phase?: number;
 };
 
 export type RenderResult = {
@@ -184,7 +189,17 @@ export function renderCommands(
       }
     }
     if (hasEmissive) {
-      applyEmissive(body, emissiveMask, palette, style.emissiveCore, style.outlineAlpha);
+      applyEmissive(body, emissiveMask, palette, {
+        coreDistance: style.emissiveCore,
+        rimAlpha: style.emissiveOutline,
+        edgeBias: style.emissiveEdgeBias,
+        turbulence: style.emissiveTurbulence,
+        turbulenceBias: style.emissiveTurbulenceBias,
+        // La moucheture monte avec le temps : une flamme grésille vers le
+        // haut, elle ne clignote pas sur place.
+        phase: (opts.phase ?? 0) * 26,
+        seed: opts.seed ?? 0x5eed,
+      });
       for (let i = 0; i < emissiveMask.length; i++) {
         if (emissiveMask[i] === 1) softMask[i] = 1;
       }
@@ -222,13 +237,14 @@ export function renderFrame(
 ): RenderResult {
   const style = opts.style ?? DEFAULT_STYLE;
   const ctx = makeContext(recipe, opts);
-  const cmds = recipe.sample(clamp01(t), ctx);
+  const clipTime = clamp01(t);
+  const cmds = recipe.sample(clipTime, ctx);
   return renderCommands(
     cmds,
     recipe.canvas.width,
     recipe.canvas.height,
     style,
-    opts,
+    { ...opts, phase: clipTime * recipe.duration },
     ctx.palette,
   );
 }
