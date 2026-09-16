@@ -231,6 +231,42 @@ function mottle(x: number, y: number, phase: number, seed: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+/**
+ * Remplit les composantes de vide qui ne touchent pas le bord du cadre et
+ * comptent moins de `maxArea` pixels. Le seuil évite de refermer une vraie
+ * ouverture — un anneau de feu volontaire resterait un anneau.
+ */
+function fillEnclosed(mask: Uint8Array, w: number, h: number, maxArea: number): void {
+  const visited = new Uint8Array(w * h);
+  const queue: number[] = [];
+  const region: number[] = [];
+  for (let start = 0; start < w * h; start++) {
+    if (mask[start] === 1 || visited[start] === 1) continue;
+    queue.length = 0;
+    region.length = 0;
+    queue.push(start);
+    visited[start] = 1;
+    let touchesBorder = false;
+    while (queue.length > 0) {
+      const i = queue.pop() as number;
+      region.push(i);
+      const x = i % w;
+      const y = (i / w) | 0;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchesBorder = true;
+      // Quatre voisins : en huit, un vide qui ne tient à l'extérieur que par
+      // un coin serait considéré comme ouvert.
+      if (x > 0 && mask[i - 1] !== 1 && visited[i - 1] === 0) { visited[i - 1] = 1; queue.push(i - 1); }
+      if (x < w - 1 && mask[i + 1] !== 1 && visited[i + 1] === 0) { visited[i + 1] = 1; queue.push(i + 1); }
+      if (y > 0 && mask[i - w] !== 1 && visited[i - w] === 0) { visited[i - w] = 1; queue.push(i - w); }
+      if (y < h - 1 && mask[i + w] !== 1 && visited[i + w] === 0) { visited[i + w] = 1; queue.push(i + w); }
+      // Un vide déjà trop grand ne sera pas comblé : inutile de le parcourir
+      // en entier, mais il faut le marquer pour ne pas le reprendre.
+    }
+    if (touchesBorder || region.length > maxArea) continue;
+    for (const i of region) mask[i] = 1;
+  }
+}
+
 export function applyEmissive(
   fb: Framebuffer,
   mask: Uint8Array,
@@ -239,6 +275,17 @@ export function applyEmissive(
 ): void {
   const w = fb.width;
   const h = fb.height;
+
+  // Bouche les trous fermés de la silhouette réunie.
+  //
+  // La matière émissive est une union de silhouettes dessinées ; un vide
+  // laissé entre trois d'entre elles est un accident de montage, pas un
+  // trait. Et il coûte cher : la transformée de distance qui suit y voit un
+  // bord, donc y pose un liseré sombre — l'explosion se retrouvait avec des
+  // yeux. Seuls les vides **enclos** sont comblés : ce qui communique avec
+  // l'extérieur est du fond, et reste du fond.
+  fillEnclosed(mask, w, h, 64);
+
   const INF = 1e6;
   const dist = new Float32Array(w * h);
 

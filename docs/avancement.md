@@ -208,9 +208,51 @@ clair, par `npm run render:all` puis `npx tsx src/cli/board.ts` — sortie dans
    plus proches : ce sont deux masses pleines à sommet irrégulier. Le jugement
    reste subjectif tant que la planche n'a pas été montrée à quelqu'un.
 
+## Passage au pixel art dessiné
+
+Le rendu procédural avait un plafond, et il était mesurable. En comptant les
+**inversions de sens** dans les longueurs de marche du contour — la mesure qui
+sépare une courbe dessinée, qui n'inverse que là où la forme tourne, d'une
+arête projetée, qui oscille — les rendus projetés se tenaient entre 0,57 et
+0,82 inversion en excès par comparaison, sur les six sorts et quatre instants
+chacun. Aucun réglage de palette, de tramage ou de contraste ne corrige cela :
+une arête projetée à un angle quelconque n'a pas de longueur de marche
+« voulue » à restituer.
+
+La matière est donc désormais **dessinée** (`src/art/`) et le moteur la place.
+Les tampons du feu mesurent 0,00 à 0,11 sur la même échelle.
+
+`fire-ball` est la première recette montée ainsi, et la seule à ce jour. Ce
+qu'elle a demandé, au-delà des dessins :
+
+| Défaut constaté | Mesure | Correction |
+|---|---|---|
+| Intérieur des flammes en confetti | `emissiveEdgeBias` valait 0 et `emissiveTurbulence` 0,92 : la couleur d'un pixel était tirée **entièrement** au bruit, la transformée de distance ne servait à rien | 1,5 / 0,34 : l'épaisseur porte la couleur, la moucheture ne fait que la casser |
+| Explosion identique sur les huit caps | 0 % d'écart de silhouette, contre 43 % en vol | Grappe placée dans le repère local et non en pixels, avec l'élan du projectile qui pousse le souffle vers l'avant → 27 % |
+| Explosion creuse, en couronne | 22 lambeaux de 95 px ne couvrent que deux tiers d'un disque de 32 px de rayon | Le compte suit l'aire : `R²/17` |
+| « Yeux » sombres dans la masse | Les vides entre trois tampons sont vus comme des bords par la transformée de distance, qui y pose un liseré | `fillEnclosed` comble les vides **enclos** de moins de 64 px, avant la transformée |
+| Auréole brune derrière la tête et flash de 50 px à l'impact | — | Les deux disques de halo sont supprimés ; la chaleur vient du blanc que la passe émissive met au cœur de la silhouette |
+| Traînée qui pendait au lieu de suivre la course | Les décalages étaient composés en unités monde, donc leur direction à l'écran changeait avec la projection | La direction de fuite est lue là où elle est vraie : à l'écran, entre deux points de la trajectoire |
+
+**Cadence.** Toutes les recettes passent à 12 images par seconde, sauf la
+foudre qui reste à 30 : elle est bâtie sur des fenêtres plus courtes qu'une
+image à 12 i/s, et un arc qui apparaît et disparaît en 20 ms n'existerait pas
+à cette cadence. Le cahier des charges autorise explicitement cette exception
+(« ne force pas tous les effets à 20 images »).
+
+**Limite assumée.** Les cinq autres recettes sont encore projetées, donc au
+plafond de contour mesuré plus haut. Le catalogue est pour l'instant
+hétérogène : le feu est dessiné, le reste ne l'est pas.
+
 ## Prochaine étape précise
 
-Écrire les deux recettes manquantes de glace demandées par le catalogue J3 —
+Étendre les tampons aux cinq autres éléments, en commençant par la glace et la
+terre : ce sont des matières à arêtes franches, donc celles où le contour
+projeté se voyait le plus (0,82 et 0,60 d'inversions en excès). Tant que ce
+n'est pas fait, le catalogue reste hétérogène.
+
+Ensuite seulement, écrire les deux recettes manquantes de glace demandées par
+le catalogue J3 —
 **couronne de cristaux** et **vague de gel qui fracture des plaques** — en
 réutilisant `grammar/solid.ts` pour la fracture et `grammar/frost.ts` pour la
 prise en glace. Cela exercera la fracture d'une surface existante, qui est la

@@ -62,9 +62,17 @@ export const DEFAULT_STYLE: StyleProfile = {
   facetRange: [0.06, 0.74],
   emissiveCore: 3,
   emissiveOutline: 0,
-  emissiveEdgeBias: 0,
-  emissiveTurbulence: 0.92,
-  emissiveTurbulenceBias: 2.6,
+  // L'épaisseur porte la couleur, la moucheture ne fait que la casser.
+  //
+  // Ces deux poids étaient réglés à 0 et 0,92 — autrement dit la valeur d'un
+  // pixel de flamme était tirée **entièrement** au bruit, et la transformée
+  // de distance calculée juste au-dessus ne servait à rien. Le résultat était
+  // un confetti orange et jaune sans bord ni cœur. Mesuré en regardant : avec
+  // l'épaisseur en tête, la flamme retrouve un liseré sombre et un cœur
+  // clair, ce qui est exactement la structure d'un feu dessiné.
+  emissiveEdgeBias: 1.5,
+  emissiveTurbulence: 0.34,
+  emissiveTurbulenceBias: 1.7,
   outline: 'rim',
   outlineAlpha: 0.85,
   glow: true,

@@ -86,7 +86,10 @@ export const iceFrostLance: SpellRecipe = {
   ],
   role: 'oneshot',
   duration: DURATION,
-  fps: 24,
+  // Douze images par seconde, comme le reste du catalogue : c'est la cadence
+  // des feuilles 16 bits, et elle oblige chaque image à porter un changement
+  // lisible au lieu de glisser d'un pixel.
+  fps: 12,
   canvas: { width: 336, height: 200 },
   pivot: { x: 165, y: 109 },
   defaultRange: 3.3,

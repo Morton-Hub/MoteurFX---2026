@@ -8,6 +8,8 @@
 import type { Vec2 } from '../core/math.js';
 import type { BlendMode, Dither, RGBA } from '../raster/framebuffer.js';
 import { ShapeMask } from '../raster/mask.js';
+import type { Stamp, StampPlacement } from '../art/stamp.js';
+import { forEachStampPixel, placementBounds } from '../art/stamp.js';
 
 export type Shape =
   | { readonly t: 'poly'; readonly pts: readonly Vec2[] }
@@ -16,7 +18,21 @@ export type Shape =
   | { readonly t: 'line'; readonly pts: readonly Vec2[]; readonly width: number }
   | { readonly t: 'disc'; readonly c: Vec2; readonly r: number }
   | { readonly t: 'ellipse'; readonly c: Vec2; readonly rx: number; readonly ry: number }
-  | { readonly t: 'ring'; readonly c: Vec2; readonly rx: number; readonly ry: number; readonly thickness: number };
+  | { readonly t: 'ring'; readonly c: Vec2; readonly rx: number; readonly ry: number; readonly thickness: number }
+  /**
+   * Silhouette dessinee, posee telle quelle. `minValue` selectionne un niveau
+   * de la grille : 1 prend toute la matiere, 2 ou 3 ne prennent que les
+   * accents chauds, ce qui permet d'en faire une commande separee au lieu
+   * d'inventer un modele de peinture par pixel.
+   */
+  | {
+      readonly t: 'stamp';
+      readonly stamp: Stamp;
+      readonly at: Vec2;
+      readonly scale?: number;
+      readonly flipX?: boolean;
+      readonly minValue?: number;
+    };
 
 /** Degrade postérisé le long de l'axe vertical écran. Bandes franches. */
 export type Ramp = {
@@ -97,7 +113,18 @@ function shapePoints(s: Shape): Vec2[] {
         { x: s.c.x - s.rx, y: s.c.y - s.ry },
         { x: s.c.x + s.rx, y: s.c.y + s.ry },
       ];
+    case 'stamp': {
+      const b = placementBounds(toPlacement(s));
+      return [
+        { x: b.x0, y: b.y0 },
+        { x: b.x1, y: b.y1 },
+      ];
+    }
   }
+}
+
+function toPlacement(s: Extract<Shape, { t: 'stamp' }>): StampPlacement {
+  return { stamp: s.stamp, x: s.at.x, y: s.at.y, scale: s.scale, flipX: s.flipX };
 }
 
 /** Rectangle écran d'une commande, sans rasterisation. */
@@ -142,6 +169,13 @@ export function addShape(mask: ShapeMask, s: Shape): void {
     case 'ring':
       mask.addEllipseRing(s.c.x, s.c.y, s.rx, s.ry, s.thickness);
       break;
+    case 'stamp': {
+      const min = s.minValue ?? 1;
+      forEachStampPixel(toPlacement(s), (x, y, v) => {
+        if (v >= min) mask.set(x, y);
+      });
+      break;
+    }
   }
 }
 
@@ -190,4 +224,11 @@ export function ellipse(c: Vec2, rx: number, ry: number): Shape {
 }
 export function ring(c: Vec2, rx: number, ry: number, thickness: number): Shape {
   return { t: 'ring', c, rx, ry, thickness };
+}
+export function stampAt(
+  s: Stamp,
+  at: Vec2,
+  opts?: { scale?: number; flipX?: boolean; minValue?: number },
+): Shape {
+  return { t: 'stamp', stamp: s, at, scale: opts?.scale, flipX: opts?.flipX, minValue: opts?.minValue };
 }

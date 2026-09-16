@@ -6,38 +6,53 @@
  * main — on voit la charge se constituer, elle ne surgit pas. La masse part.
  * Elle éclate.
  *
- * Rien ici n'est un solide. Les tentatives précédentes peignaient le feu
- * comme des corps distincts empilés, chacun avec son contour et son dégradé :
- * ça donnait un amas de briques orange. Toute la matière de ce sort est
- * déclarée `emissive`, donc le renderer prend la **silhouette réunie** de ce
- * qui brûle et la colore par son épaisseur — bord sombre, cœur blanc. Deux
- * langues qui se recouvrent fusionnent en un corps plus épais, donc plus
- * chaud en son milieu. C'est ce qui fait qu'une boule de feu se lit comme une
- * masse et non comme un tas.
+ * C'est la première recette montée sur des **tampons dessinés**. Le moteur
+ * ne fabrique plus la matière du feu en projetant des polygones : il pose des
+ * silhouettes dessinées à la main (`src/art/fireStamps.ts`) et garde pour lui
+ * ce qu'il sait faire — trajectoire, cap, rythme, profondeur, export. La
+ * raison est mesurée : le contour d'une arête projetée oscille presque
+ * partout, celui d'un dessin n'inverse que là où la forme tourne vraiment
+ * (voir `tests/stamps.test.ts`).
  *
- * Signature de forme : une masse ronde et churnante à la tête, une traînée
- * qui s'effiloche derrière, une explosion qui s'ouvre large avant de monter
- * et de se déchirer en langues.
+ * Deux conséquences assumées :
+ *
+ *  - Les tailles sont **discrètes**. La boule passe de 7 à 11 à 15 pixels,
+ *    elle ne grandit pas continûment. C'est exactement ce que faisaient les
+ *    feuilles de sprites, et à 12 images par seconde l'œil lit une croissance,
+ *    pas des paliers.
+ *  - Les tampons ne suivent pas `groundScale`. Un sprite ne change pas de
+ *    définition quand la caméra recule ; c'est la forme la plus stricte de la
+ *    règle « le cadrage ne dimensionne jamais les objets ».
+ *
+ * Rien ici n'est un solide. Toute la matière qui brûle est déclarée
+ * `emissive` : le renderer prend la **silhouette réunie** de tous ces tampons
+ * et la colore par son épaisseur — bord sombre, cœur blanc. Deux tampons qui
+ * se recouvrent fusionnent en un corps plus épais, donc plus chaud au milieu.
+ * C'est ce qui fait qu'un amas de tampons se lit comme une masse et non comme
+ * un tas de vignettes, et c'est pourquoi les dessins ne portent aucune couleur.
  */
 
-import {
-  type Vec3,
-  add3,
-  clamp01,
-  easeIn,
-  easeOut,
-  easeOutExpo,
-  ramp,
-  scale3,
-  window4,
-} from '../core/math.js';
+import { type Vec3, type Vec2, add3, clamp01, easeIn, easeOut, easeOutExpo, ramp, window4 } from '../core/math.js';
 import { deriveSeed, randRange } from '../core/rng.js';
 import { depthOf } from '../space/projection.js';
-import { type DrawCmd, poly } from '../render/draw.js';
+import { type DrawCmd, stampAt } from '../render/draw.js';
 import { fade } from '../raster/framebuffer.js';
-import { blobPolygon, type BlobSpec } from '../grammar/blob.js';
 import { emitDebris } from '../grammar/motion.js';
-import { emitPlate, residueAlpha } from '../grammar/ground.js';
+import { residueAlpha } from '../grammar/ground.js';
+import {
+  BALL_7,
+  BALL_11,
+  BALL_15,
+  EMBER,
+  FLAME_L,
+  FLAME_S,
+  LUMP_9,
+  LUMP_13,
+  PUFF_7,
+  PUFF_11,
+  SPARK,
+} from '../art/fireStamps.js';
+import type { Stamp } from '../art/stamp.js';
 import type { SpellContext, SpellRecipe } from '../sim/types.js';
 
 const DURATION = 1.5;
@@ -55,41 +70,47 @@ const T = {
   smokeEnd: CLIP_OUT,
 } as const;
 
+/** Les trois tailles de masse, du plus petit au plus gros. */
+const BALLS = [BALL_7, BALL_11, BALL_15] as const;
+
 /**
- * Une flamme : un contour mou, sans couleur propre.
+ * Choisit le dessin dont le diamètre approche le mieux la taille voulue.
  *
- * La couleur est posée par la passe émissive à partir de l'épaisseur de la
- * silhouette réunie, donc inutile — et contre-productif — de la décider ici :
- * c'est précisément ce qui transformait les lobes en objets séparés.
+ * Aucune interpolation : on prend un dessin ou un autre. C'est le seul moyen
+ * de garder les pixels tels qu'ils ont été posés — redimensionner un tampon
+ * d'un facteur non entier rééchantillonne le contour et rend exactement le
+ * bruit qu'on cherchait à quitter.
  */
-function flame(
+function ballFor(diameter: number): Stamp | null {
+  if (diameter < 4) return null;
+  let best = BALLS[0] as Stamp;
+  let bestErr = Infinity;
+  for (const b of BALLS) {
+    const err = Math.abs(b.width - diameter);
+    if (err < bestErr) {
+      bestErr = err;
+      best = b;
+    }
+  }
+  return best;
+}
+
+/** Pose un tampon qui brûle. La couleur vient de la passe émissive. */
+function burn(
   ctx: SpellContext,
-  spec: BlobSpec,
+  s: Stamp,
+  at: Vec2,
   depth: number,
-  alpha = 1,
-  tag = 'flame',
-): DrawCmd[] {
-  // Une flamme ne s'efface pas en se trouant : elle rétrécit et s'éteint.
-  //
-  // Tramer l'opacité d'un corps émissif perce sa silhouette, et la passe
-  // émissive mesure alors l'épaisseur d'un grillage : toute la masse retombe
-  // sur les échelons sombres et l'explosion finit en treillis rouge. On
-  // module donc le rayon, et la langue disparaît d'un coup une fois trop
-  // faible pour compter.
-  if (alpha < 0.3 || spec.radius <= 0.02) return [];
-  const shrunk: BlobSpec = { ...spec, radius: spec.radius * (0.55 + 0.45 * clamp01(alpha)) };
-  const pts = blobPolygon(ctx.projection, shrunk);
-  if (pts.length < 3) return [];
-  return [
-    {
-      layer: 'main',
-      material: 'emissive',
-      depth,
-      shape: poly(pts.map((p) => ctx.p(p))),
-      paint: { color: ctx.palette.ramp[1] ?? ctx.palette.core },
-      tag,
-    },
-  ];
+  opts?: { flipX?: boolean; tag?: string },
+): DrawCmd {
+  return {
+    layer: 'main',
+    material: 'emissive',
+    depth,
+    shape: stampAt(s, at, { flipX: opts?.flipX }),
+    paint: { color: ctx.palette.ramp[1] ?? ctx.palette.core },
+    tag: opts?.tag ?? 'flame',
+  };
 }
 
 export const fireBall: SpellRecipe = {
@@ -97,16 +118,19 @@ export const fireBall: SpellRecipe = {
   element: 'fire',
   title: 'Boule de Feu',
   concept:
-    "Des flammes se rassemblent dans la main du lanceur jusqu'à former une masse, qui part en laissant une traînée effilochée, puis éclate à la cible en s'ouvrant large avant de monter et de se déchirer en langues.",
+    "Des flammes dessinées se rassemblent dans la main du lanceur jusqu'à former une masse, qui part en laissant derrière elle des lambeaux qui s'éteignent, puis éclate à la cible en s'ouvrant large avant de monter et de se déchirer en langues.",
   signature: [
-    'Une masse ronde et churnante, jamais un empilement de lobes distincts',
-    "Charge visible : les flammes convergent et s'accumulent avant le tir",
-    "Traînée qui s'effiloche derrière la tête, pas un ruban propre",
+    'Silhouettes dessinées, jamais de contour reconstruit par projection',
+    "Charge visible : les langues convergent et la masse grossit par paliers",
+    "Sillage fait de lambeaux lâchés derrière la tête, pas d'un ruban continu",
     "Explosion qui s'ouvre d'abord large et basse, puis monte et se déchire",
   ],
   role: 'oneshot',
   duration: DURATION,
-  fps: 24,
+  // Douze images par seconde. La cadence fait autant que le dessin : à 24,
+  // chaque image ne diffère que d'un pixel ou deux et l'animation glisse au
+  // lieu de claquer. Les feuilles 16 bits tenaient entre 8 et 12.
+  fps: 12,
   canvas: { width: 384, height: 272 },
   pivot: { x: 192, y: 163 },
   defaultRange: 3.3,
@@ -126,18 +150,18 @@ export const fireBall: SpellRecipe = {
     const pal = ctx.palette;
     const style = ctx.style;
     const seed = deriveSeed(ctx.seed, 'fire-ball');
-    // Le rang grossit la charge — plus de flammes convergent, donc une masse
-    // plus épaisse, donc un cœur plus blanc — et ouvre l'explosion plus large.
+    // Le rang change le comportement, pas la définition : plus de langues
+    // convergent à la charge, la masse atteint une taille dessinée de plus,
+    // et la boule de feu s'ouvre plus large — donc avec plus de lambeaux,
+    // puisque leur nombre suit son aire.
     const wisps = 5 + Math.round(ctx.power * 5);
-    const bloomLobes = 9 + Math.round(ctx.power * 7);
+    const headSize = 11 + ctx.power * 8;
 
     const hand: Vec3 = ctx.wl(0.34, 0, 0.72);
     const target: Vec3 = ctx.wl(ctx.distance, 0, 0.55);
 
     // ------------------------------------------------------------------
     // Charge : des langues tournent autour de la main et s'y rabattent.
-    // Leur convergence fait grossir la masse — la boule n'apparaît pas, elle
-    // se constitue.
     // ------------------------------------------------------------------
     const charge = window4(t, T.gather, T.charged, T.release, T.release + 0.03);
     if (charge > 0 && t < T.release + 0.03) {
@@ -145,7 +169,7 @@ export const fireBall: SpellRecipe = {
         const at = T.gather + i * 0.022;
         const pull = clamp01(ramp(t, at, T.charged));
         if (pull <= 0) continue;
-        // Spirale rentrante : la flamme part loin et se rabat sur la main.
+        // Spirale rentrante : la langue part loin et se rabat sur la main.
         const angle = randRange(seed, i, 601, 0, Math.PI * 2) + pull * 4.2;
         const reach = (0.95 + randRange(seed, i, 602, 0, 0.5)) * (1 - easeIn(pull));
         const lift = randRange(seed, i, 603, -0.35, 0.45) * (1 - pull);
@@ -154,48 +178,17 @@ export const fireBall: SpellRecipe = {
           y: Math.sin(angle) * reach,
           z: lift,
         });
-        out.push(
-          ...flame(
-            ctx,
-            {
-              center: centre,
-              radius: (0.19 + randRange(seed, i, 604, 0, 0.12)) * (0.5 + pull * 0.9),
-              aspect: 1.5 - pull * 0.4,
-              lean: 0.2,
-              wobble: 0.34,
-              phase: t * 18 + i * 1.7,
-              sides: 10,
-              seed: seed + i * 173,
-              taper: 0.45,
-            },
-            depthOf(centre) + 2,
-            charge,
-            'gather',
-          ),
-        );
+        // Une langue qui s'éteint rétrécit d'un dessin, elle ne se trame pas :
+        // trouer une silhouette émissive ferait mesurer l'épaisseur d'un
+        // grillage à la passe de couleur.
+        const near = charge * (0.4 + 0.6 * pull);
+        const s = near > 0.72 ? FLAME_L : near > 0.34 ? FLAME_S : EMBER;
+        out.push(burn(ctx, s, ctx.p(centre), depthOf(centre) + 2, { flipX: i % 2 === 1, tag: 'gather' }));
       }
       // Le noyau qui grossit à mesure que les langues arrivent.
       const grown = easeOut(clamp01(ramp(t, T.gather + 0.04, T.charged)));
-      const pulse = 1 + 0.08 * Math.sin(t * 40);
-      out.push(
-        ...flame(
-          ctx,
-          {
-            center: hand,
-            radius: 0.56 * grown * pulse,
-            aspect: 1.05,
-            lean: 0.05,
-            wobble: 0.26,
-            phase: t * 22,
-            sides: 13,
-            seed: seed + 5,
-            taper: 0.1,
-          },
-          depthOf(hand) + 3,
-          charge,
-          'core',
-        ),
-      );
+      const core = ballFor(grown * headSize);
+      if (core) out.push(burn(ctx, core, ctx.p(hand), depthOf(hand) + 3, { tag: 'core' }));
     }
 
     // ------------------------------------------------------------------
@@ -218,82 +211,70 @@ export const fireBall: SpellRecipe = {
       const eased = easeOutExpo(flight) * 0.25 + flight * 0.75;
       const head = posAt(eased);
 
-      // Traînée : des langues lâchées derrière la tête, qui ralentissent et
-      // s'amincissent. Elles se recouvrent, donc la passe émissive les fond
-      // en une queue continue plutôt qu'en un chapelet.
-      for (let k = 12; k >= 1; k--) {
-        const back = eased - k * 0.026;
-        if (back <= 0) continue;
-        const p = posAt(back);
-        const age = k / 12;
-        const drift = add3(p, {
-          x: randRange(seed, k, 605, -0.12, 0.12) * age,
-          y: randRange(seed, k, 606, -0.12, 0.12) * age,
-          z: age * 0.24,
-        });
-        out.push(
-          ...flame(
-            ctx,
-            {
-              center: drift,
-              radius: (0.46 - age * 0.3) * (0.85 + 0.3 * Math.sin(k * 2.1 + t * 26)),
-              aspect: 1.1 + age * 0.6,
-              lean: 0.14,
-              wobble: 0.38 + age * 0.3,
-              phase: t * 20 + k * 1.3,
-              sides: 10,
-              seed: seed + 400 + k * 131,
-              taper: 0.25,
-            },
-            depthOf(drift) - k * 0.02,
-            1 - ramp(age, 0.7, 1),
-            'trail',
-          ),
-        );
+      // Sillage et tête, posés ensemble en **espace écran**.
+      //
+      // Une traînée doit partir droit derrière la tête, quel que soit le cap.
+      // En composant les décalages en unités monde on obtenait une queue dont
+      // la direction changeait avec la projection, et qui sur la plupart des
+      // caps pendait vers le bas au lieu de suivre la course. La direction de
+      // fuite se lit donc là où elle est vraie : sur l'écran, entre deux
+      // points de la trajectoire.
+      const hp = ctx.p(head);
+      const prev = ctx.p(posAt(eased - 0.06));
+      const dx = hp.x - prev.x;
+      const dy = hp.y - prev.y;
+      const len = Math.hypot(dx, dy);
+      // Départ arrêté : tant que la tête n'a pas bougé, aucune direction de
+      // fuite n'existe. Une valeur par défaut serait une queue qui pointe au
+      // hasard ; on n'en met pas.
+      const bx = len > 0.001 ? -dx / len : 0;
+      const by = len > 0.001 ? -dy / len : 0;
+
+      const ball = ballFor(headSize) ?? BALL_11;
+      out.push(burn(ctx, ball, hp, depthOf(head) + 4, { tag: 'head' }));
+
+      // Les lambeaux se suivent tous les cinq pixels : assez près pour que la
+      // passe émissive les soude en une queue continue, assez espacés pour
+      // qu'elle s'affine visiblement. Les derniers se détachent en braises.
+      if (len > 0.001) {
+        const TAIL: readonly (readonly [Stamp, number])[] = [
+          [LUMP_9, 5],
+          [PUFF_7, 10],
+          [PUFF_7, 15],
+          [EMBER, 20],
+          [EMBER, 25],
+          [SPARK, 30],
+          [SPARK, 36],
+        ];
+        for (let k = 0; k < TAIL.length; k++) {
+          const [s, d] = TAIL[k] as readonly [Stamp, number];
+          // La queue s'allonge avec la vitesse : au départ elle est courte,
+          // en pleine course elle file.
+          const reach = d * (0.45 + 0.55 * flight);
+          // Elle ondule légèrement, sinon c'est un trait.
+          const wag = Math.sin(t * 30 + k * 1.1) * (k * 0.35);
+          out.push(
+            burn(
+              ctx,
+              s,
+              {
+                x: hp.x + Math.round(bx * reach - by * wag),
+                y: hp.y + Math.round(by * reach + bx * wag),
+              },
+              depthOf(head) + 3.5 - k * 0.01,
+              { flipX: k % 2 === 1, tag: 'trail' },
+            ),
+          );
+        }
       }
 
-      // Tête : trois lobes qui se recouvrent et tournent. Le churn vient de
-      // leur rotation les uns par rapport aux autres, pas d'un bruit global.
-      for (let i = 0; i < 3; i++) {
-        const spin = t * 26 + (i * Math.PI * 2) / 3;
-        const off = 0.14;
-        const centre = add3(head, {
-          x: Math.cos(spin) * off,
-          y: Math.sin(spin) * off * 0.6,
-          z: Math.sin(spin * 1.3) * off * 0.5,
-        });
-        out.push(
-          ...flame(
-            ctx,
-            {
-              center: centre,
-              radius: 0.6 + 0.07 * Math.sin(spin * 2),
-              aspect: 1.02,
-              lean: 0.08,
-              wobble: 0.3,
-              phase: t * 24 + i * 2.1,
-              sides: 12,
-              seed: seed + 900 + i * 331,
-              taper: 0.12,
-            },
-            depthOf(head) + 4 + i * 0.01,
-            1,
-            'head',
-          ),
-        );
-      }
+      // Pas de disque de halo. Un disque tramé posé derrière la tête ne se
+      // lit pas comme de la lumière mais comme une auréole sale, et sur fond
+      // sombre la couleur de halo vire au brun. Ce qui donne la chaleur ici,
+      // c'est le blanc que la passe émissive met au cœur de la silhouette :
+      // il est déjà là, et il a la forme de la flamme.
 
-      if (style.glow) {
-        out.push({
-          layer: 'light',
-          depth: depthOf(head) + 5,
-          shape: { t: 'disc', c: ctx.p(head), r: 17 },
-          paint: { color: fade(pal.glow, 0.42), dither: { level: 0.55 } },
-          tag: 'glow',
-        });
-      }
-
-      // Braises lâchées par la traînée.
+      // Braises lâchées par le sillage.
       out.push(
         ...emitDebris(ctx, {
           seed: seed + 61,
@@ -325,116 +306,185 @@ export const fireBall: SpellRecipe = {
     const impact = ctx.wl(ctx.distance, 0, 0);
 
     // Sol : brûlure, puis résidu.
+    //
+    // Une plaque polygonale posée à plat se lisait comme un hexagone sombre —
+    // une forme nette là où il faut une tache. La brûlure est donc faite des
+    // mêmes dessins que le reste, assombris et tramés : des masses qui se
+    // recouvrent n'ont pas de bord franc.
     const scorch = residueAlpha(t, 0.74, 0.99, 0.55) * easeOut(clamp01(age / 0.1));
-    out.push(...emitPlate(ctx, impact, 1.3, 11, seed + 21, pal.rim, scorch, 'decal', 0.32));
+    if (scorch > 0.02) {
+      const ip = ctx.p(impact);
+      // Assez de dessins pour que la tache soit continue : à cinq elle se
+      // lisait comme une poignée de pastilles sombres posées sous le feu.
+      // Aplatie, aussi — une brûlure est vue au ras du sol.
+      for (let i = 0; i < 11; i++) {
+        const a = (i / 11) * Math.PI * 2 * 3 + randRange(seed, i, 641, -0.5, 0.5);
+        const r = i === 0 ? 0 : 5 + randRange(seed, i, 642, 0, 16);
+        out.push({
+          layer: 'ground',
+          material: 'soft',
+          depth: depthOf(impact) - 4 - i * 0.01,
+          shape: stampAt(i % 3 === 0 ? LUMP_13 : LUMP_9, {
+            x: ip.x + Math.round(Math.cos(a) * r),
+            y: ip.y + Math.round(Math.sin(a) * r * 0.42),
+          }, { flipX: i % 2 === 1 }),
+          paint: { color: fade(pal.rim, scorch * 0.34), dither: { level: 0.45, matrix: 4 } },
+          tag: 'decal',
+        });
+      }
+    }
 
-    // Le corps de l'explosion. Il s'ouvre d'abord large et bas — c'est ce
-    // temps-là qui donne le souffle —, puis il monte et se déchire.
+    // Le corps de l'explosion.
+    //
+    // Aucun dessin ne fait la taille d'une explosion, et agrandir un tampon
+    // d'un facteur 2 donnerait des pixels deux fois plus gros que le reste du
+    // sprite — le défaut le plus visible qu'on puisse commettre en pixel art.
+    // La masse est donc **composée** d'une grappe de dessins à taille
+    // normale, que la passe émissive réunit en un seul corps.
+    //
+    // Ce qui décide de tout ici, c'est la distance entre deux dessins
+    // voisins : trop loin, la grappe se lit comme une rangée de bougies ;
+    // assez près, elle devient une masse. On raisonne donc en **pixels**
+    // — mais on place en **monde**, dans le repère local du sort.
+    //
+    // Une première version posait les lambeaux directement en pixels autour
+    // de l'impact. Mesuré : la silhouette de l'explosion était identique au
+    // pixel près sur les huit caps, alors que le vol variait de 43 %. Un
+    // souffle est bien symétrique, mais il emporte l'élan du projectile —
+    // il doit s'ouvrir vers l'avant. Le repère local porte ce cap, donc on y
+    // place, et la conversion ci-dessous garde le contrôle du recouvrement.
     const open = easeOut(clamp01(age / 0.13));
     const rise = clamp01(ramp(t, T.bloom - 0.06, 0.86));
     const fadeOut = 1 - ramp(t, 0.8, 0.92);
     if (fadeOut > 0) {
-      for (let i = 0; i < bloomLobes; i++) {
-        const a = (i / bloomLobes) * Math.PI * 2 + randRange(seed, i, 611, -0.3, 0.3);
-        const band = randRange(seed, i, 612, 0.35, 1);
-        const spread = (0.28 + 0.82 * band) * open * (1 + rise * 0.4);
+      const alive = fadeOut * (1 - ramp(rise, 0.72, 1));
+      const ip = ctx.p(impact);
+      // Combien de pixels vaut une unité monde, ici, dans ce cadrage : mesuré
+      // sur le repère local plutôt que supposé, pour rester juste si la
+      // projection change.
+      const oF = ctx.pl(ctx.distance + 1, 0, 0);
+      const oS = ctx.pl(ctx.distance, 1, 0);
+      const oU = ctx.pl(ctx.distance, 0, 1);
+      // Deux échelles, pas une : dans cette projection la hauteur n'a pas le
+      // même nombre de pixels par unité que le sol. Convertir la verticale
+      // avec l'échelle du sol étirait la grappe et la creusait — elle se
+      // lisait comme un anneau de flammes avec un trou au milieu.
+      const pxFlat = Math.max(2, Math.hypot(oF.x - ip.x, oS.x - ip.x));
+      const pxUp = Math.max(2, Math.abs(oU.y - ip.y));
+      // Rayon écran de la boule de feu, en pixels, ramené en unités monde.
+      const R = open * (26 + ctx.power * 10) * (1 + rise * 0.35);
+      const rw = R / pxFlat;
+      // L'élan du projectile pousse le souffle vers l'avant : c'est ce qui
+      // rend l'explosion différente d'un cap à l'autre.
+      const push = 0.35 * open;
+      // Assez de lambeaux pour couvrir la masse sans trou.
+      //
+      // Le compte se calcule, il ne se devine pas : l'aire à couvrir vaut
+      // πR², un dessin en couvre une centaine de pixels, et des tirages
+      // aléatoires se recouvrent — il en faut donc bien plus que le quotient.
+      // Réglé à πR²/46, l'explosion se creusait en couronne à mi-parcours,
+      // parce que 22 lambeaux de 95 pixels ne couvrent que les deux tiers
+      // d'un disque de 32 pixels de rayon.
+      const lobes = Math.max(14, Math.round((R * R) / 17));
+      for (let i = 0; i < lobes; i++) {
+        if (alive <= 0.12) break;
+        const a = randRange(seed, i, 611, 0, Math.PI * 2);
+        // Racine carrée : sans elle les tirages s'entassent au centre et le
+        // bord reste clairsemé.
+        const rad = rw * Math.sqrt(randRange(seed, i, 612, 0.02, 1));
         const lobeSeedZ = randRange(seed, i, 613, 0.1, 0.75);
-        const centre = add3(impact, {
-          x: Math.cos(a) * spread,
-          y: Math.sin(a) * spread * 0.9,
-          // Bas à l'ouverture, haut ensuite : le souffle passe, la colonne monte.
-          z: 0.3 + lobeSeedZ * 0.5 + rise * (1.1 + lobeSeedZ * 1.5),
-        });
-        const shrink = 1 - rise * 0.45;
-        out.push(
-          ...flame(
-            ctx,
-            {
-              center: centre,
-              radius: (0.46 + randRange(seed, i, 614, 0, 0.26)) * open * shrink,
-              aspect: 1 + rise * 1.1,
-              lean: Math.cos(a) * 0.2,
-              wobble: 0.34 + rise * 0.24,
-              phase: t * 16 + i * 1.9,
-              sides: 12,
-              seed: seed + 1300 + i * 197,
-              taper: 0.2 + rise * 0.4,
-            },
-            depthOf(centre) + 2,
-            fadeOut * (1 - ramp(rise, 0.72, 1)),
-            'bloom',
-          ),
+        // Bas et large à l'ouverture, haut et resserré ensuite : le souffle
+        // passe, la colonne monte.
+        // Épaisseur verticale du même ordre que le rayon : une grappe plate
+        // se lit comme une flaque, une grappe trop haute comme une colonne.
+        const liftPx = 5 + lobeSeedZ * 7 + rise * (16 + lobeSeedZ * 20);
+        const lift = liftPx / pxUp;
+        const w = ctx.pl(
+          ctx.distance + push + Math.cos(a) * rad,
+          Math.sin(a) * rad,
+          lift,
         );
-      }
-      // Langues de bord : plus fines, plus loin, dans l'axe radial. Elles
-      // touchent la masse, donc la passe émissive les y soude — le contour
-      // cesse d'être une patate lisse et se met à lécher.
-      for (let i = 0; i < bloomLobes; i++) {
-        const a = (i / bloomLobes) * Math.PI * 2 + randRange(seed, i, 621, -0.5, 0.5);
-        const band = randRange(seed, i, 622, 0.7, 1.35);
-        const spread = (0.55 + 0.95 * band) * open * (1 + rise * 0.5);
-        const centre = add3(impact, {
-          x: Math.cos(a) * spread,
-          y: Math.sin(a) * spread * 0.9,
-          z: 0.34 + randRange(seed, i, 623, 0, 0.6) + rise * (1.3 + randRange(seed, i, 624, 0, 1.2)),
-        });
+        const at: Vec2 = { x: Math.round(w.x), y: Math.round(w.y) };
+        // En montant, la colonne se déchire : les masses cèdent la place aux
+        // langues, puis aux braises. Les tailles alternent — des dessins
+        // identiques posés en cercle se liraient comme un motif.
+        const big = randRange(seed, i, 631, 0, 1) > 0.45;
+        const s =
+          alive < 0.3
+            ? EMBER
+            : rise > 0.45
+              ? (big ? FLAME_L : FLAME_S)
+              : big
+                ? LUMP_13
+                : LUMP_9;
         out.push(
-          ...flame(
-            ctx,
-            {
-              center: centre,
-              radius: (0.2 + randRange(seed, i, 625, 0, 0.14)) * open * (1 - rise * 0.35),
-              aspect: 1.7 + rise * 1.2,
-              lean: Math.cos(a) * 0.35,
-              wobble: 0.42,
-              phase: t * 19 + i * 2.3,
-              sides: 11,
-              seed: seed + 2100 + i * 211,
-              taper: 0.55 + rise * 0.3,
-            },
-            depthOf(centre) + 2.5,
-            fadeOut * (1 - ramp(rise, 0.66, 1)),
-            'tongue',
-          ),
+          burn(ctx, s, at, depthOf(impact) + 2 + i * 0.001, {
+            flipX: i % 2 === 1,
+            tag: 'bloom',
+          }),
         );
       }
 
-      // Cœur : il tient bas et garde l'épaisseur qui donne le blanc.
+      // Langues de bord : posées sur le contour de la masse, orientées vers
+      // le haut. Elles la touchent, donc la passe émissive les y soude — le
+      // contour cesse d'être une patate lisse et se met à lécher. Une langue
+      // qui ne touche pas la masse serait une vignette isolée.
+      const edgeAlive = fadeOut * (1 - ramp(rise, 0.66, 1));
+      if (edgeAlive > 0.12) {
+        const edges = 6 + Math.round(ctx.power * 6);
+        for (let i = 0; i < edges; i++) {
+          const a = (i / edges) * Math.PI * 2 + randRange(seed, i, 621, -0.4, 0.4);
+          const rad = rw * randRange(seed, i, 622, 0.7, 1.05);
+          const lift = (6 + randRange(seed, i, 623, 0, 10) + rise * 24) / pxUp;
+          const w = ctx.pl(
+            ctx.distance + push + Math.cos(a) * rad,
+            Math.sin(a) * rad,
+            lift,
+          );
+          const at: Vec2 = { x: Math.round(w.x), y: Math.round(w.y) };
+          const s =
+            edgeAlive <= 0.45
+              ? SPARK
+              : randRange(seed, i, 632, 0, 1) > 0.6
+                ? FLAME_L
+                : FLAME_S;
+          out.push(
+            burn(ctx, s, at, depthOf(impact) + 2.5 + i * 0.001, {
+              // Une langue penche du côté où elle part : le miroir suffit, on
+              // ne fait jamais tourner un dessin.
+              flipX: Math.cos(a) < 0,
+              tag: 'tongue',
+            }),
+          );
+        }
+      }
+
+      // Cœur : il tient bas, au centre, et garde l'épaisseur qui donne le
+      // blanc. Sans lui la grappe se creuse au milieu quand les lambeaux
+      // partent vers le bord.
       const coreLife = window4(t, T.contact, T.contact + 0.03, T.contact + 0.16, T.bloom + 0.08);
-      if (coreLife > 0) {
-        out.push(
-          ...flame(
-            ctx,
-            {
-              center: add3(impact, { x: 0, y: 0, z: 0.42 + rise * 0.5 }),
-              radius: 0.98 * open * (1 - rise * 0.5),
-              aspect: 0.92 + rise * 0.7,
-              lean: 0.04,
-              wobble: 0.22,
-              phase: t * 15,
-              sides: 14,
-              seed: seed + 11,
-              taper: 0.12,
-            },
-            depthOf(impact) + 3,
-            coreLife,
-            'bloom',
-          ),
-        );
+      if (coreLife > 0.15) {
+        for (let i = 0; i < 3; i++) {
+          const w = ctx.pl(
+            ctx.distance + push * 0.6 + randRange(seed, i, 651, -0.25, 0.25),
+            randRange(seed, i, 653, -0.25, 0.25),
+            (8 + rise * 12 + randRange(seed, i, 652, 0, 5)) / pxUp,
+          );
+          const at: Vec2 = { x: Math.round(w.x), y: Math.round(w.y) };
+          out.push(
+            burn(ctx, coreLife > 0.6 ? LUMP_13 : LUMP_9, at, depthOf(impact) + 3 + i * 0.001, {
+              flipX: i === 1,
+              tag: 'bloom',
+            }),
+          );
+        }
       }
     }
 
-    // Flash de contact : très court, anguleux.
-    const flash = window4(t, T.contact - 0.005, T.contact + 0.015, T.contact + 0.04, T.contact + 0.075);
-    if (flash > 0 && style.glow) {
-      out.push({
-        layer: 'light',
-        depth: depthOf(impact) + 12,
-        shape: { t: 'disc', c: ctx.p(add3(impact, { x: 0, y: 0, z: 0.5 })), r: 20 + 30 * flash },
-        paint: { color: fade(pal.glow, 0.6 * flash), dither: { level: 0.5 } },
-        tag: 'glow',
-      });
-    }
+    // Pas de flash blanc non plus : le cahier des charges le refuse comme
+    // réflexe, et un disque de cinquante pixels de large posé sur l'impact
+    // effaçait justement le dessin qu'on venait de gagner. Le coup se lit à
+    // l'ouverture de la masse, qui passe de rien à cent pixels en une image.
 
     // Braises projetées puis fumée.
     out.push(
@@ -459,44 +509,36 @@ export const fireBall: SpellRecipe = {
       }),
     );
 
-    for (let i = 0; i < 5; i++) {
-      const at = T.contact + 0.2 + i * 0.05;
-      const life = Math.min(0.38, CLIP_OUT - at);
+    // Fumée : les mêmes bouffées dessinées, en gris et non émissives. Un
+    // polygone projeté donnait ici un caillou gris à bord net — le défaut
+    // exact qu'on venait de quitter, et le plus visible parce que c'est la
+    // dernière chose que l'œil voit avant la fin du clip.
+    for (let i = 0; i < 7; i++) {
+      const at = T.contact + 0.18 + i * 0.04;
+      const life = Math.min(0.42, CLIP_OUT - at);
       const smokeAge = t - at;
       if (smokeAge < 0 || smokeAge > life) continue;
       const k = clamp01(smokeAge / life);
       const centre = add3(impact, {
-        x: randRange(seed, i, 616, -0.6, 0.6) * (0.5 + k),
-        y: randRange(seed, i, 617, -0.6, 0.6) * (0.5 + k),
-        z: 1 + 1.6 * easeOut(k),
+        x: randRange(seed, i, 616, -0.5, 0.5) * (0.4 + k),
+        y: randRange(seed, i, 617, -0.5, 0.5) * (0.4 + k),
+        z: 0.8 + 1.7 * easeOut(k),
       });
-      const pts = blobPolygon(ctx.projection, {
-        center: centre,
-        radius: (0.26 + randRange(seed, i, 618, 0, 0.14)) * (1 + k * 1.2),
-        aspect: 1.15,
-        lean: 0.12,
-        wobble: 0.36,
-        phase: t * 6 + i * 3,
-        sides: 12,
-        seed: seed + 1700 + i * 131,
-        taper: 0.15,
-      });
+      // Elle se dissipe en rapetissant d'un dessin, jamais en se trouant.
+      const s = k < 0.45 ? PUFF_11 : k < 0.8 ? PUFF_7 : EMBER;
       out.push({
         layer: 'main',
-        // La fumée n'est pas émissive : elle ne doit pas se fondre dans la
-        // silhouette du feu, sinon elle en rallumerait le cœur.
         material: 'soft',
         depth: depthOf(centre) - 2,
-        shape: poly(pts.map((p) => ctx.p(p))),
+        shape: stampAt(s, ctx.p(centre), { flipX: i % 2 === 1 }),
         paint: {
-          color: fade(pal.debris, (1 - k) * 0.55 * (1 - ramp(t, CLIP_OUT - 0.1, CLIP_OUT))),
-          dither: { level: 0.6 - k * 0.3, matrix: 4 },
+          color: fade(pal.debris, (1 - k * 0.5) * 0.6 * (1 - ramp(t, CLIP_OUT - 0.1, CLIP_OUT))),
+          dither: { level: 0.7 - k * 0.35, matrix: 4 },
         },
         tag: 'smoke',
       });
     }
 
-    void scale3;
     return out;
   },
 };

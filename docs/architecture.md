@@ -10,6 +10,7 @@
 | `render/draw` | commandes de dessin en espace écran | ne touche pas le framebuffer |
 | `render/renderer` | tri 2.5D, rastérisation, passes, limites de capture | ne fabrique pas de géométrie |
 | `style/` | StyleProfile, palettes par rôle | ne décide d'aucune forme |
+| `art/` | tampons dessinés et leur placement | ne connaît ni cap ni recette |
 | `grammar/` | primitives par famille de matière | n'impose aucune recette |
 | `sim/` | contrat d'une recette, événements | ne calcule pas de dégâts |
 | `spells/` | les recettes | ne parle jamais au framebuffer |
@@ -209,6 +210,47 @@ pas provoquer de recadrage. Les limites de capture sont calculées en prépasse
 sur toutes les images **et** tous les caps, avec marge explicite ; un test
 vérifie qu'elles tiennent dans le canevas déclaré, et `npm run bounds` propose
 un canevas et un pivot corrects quand ce n'est plus le cas.
+
+### Tampons dessinés : où s'arrête le procédural
+
+Le moteur a d'abord fabriqué toute sa matière en projetant de la géométrie.
+Mesure faite sur le contour des rendus, en comptant les **inversions de sens**
+dans la suite des longueurs de marche — ce qui distingue une courbe dessinée,
+qui n'inverse que là où la forme tourne, d'une arête projetée, qui oscille :
+
+| | inversions en excès, par comparaison |
+|---|---|
+| rendus projetés (6 sorts × 4 instants) | 0,57 à 0,82 |
+| tampons dessinés | 0,00 à 0,11 |
+
+Ce bruit est structurel : une arête projetée à un angle quelconque n'a aucune
+longueur de marche « voulue » à restituer, donc aucun post-traitement ne peut
+la reconstruire. D'où `art/` : les silhouettes sont **dessinées**, le moteur
+les place. Le procédural garde ce qu'il fait mieux qu'un dessinateur —
+trajectoire, cap, rythme, profondeur, déterminisme, export — et la matière
+vient du dessin.
+
+Trois règles gardent les pixels intacts : placement à des coordonnées
+**entières**, agrandissement **entier** uniquement, miroir horizontal autorisé
+et **rotation jamais**. Le miroir suffit à couvrir huit caps avec cinq
+dessins : dans cette projection `screenX ∝ cos θ − sin θ` et
+`screenY ∝ cos θ + sin θ`, donc les caps θ et π/2 − θ sont exactement
+symétriques à l'écran. C'est la raison pour laquelle les jeux 16 bits ne
+dessinaient que cinq orientations sur huit (`mirrorPairs`).
+
+Un tampon est une `Shape` comme une autre : il hérite donc du tri par
+profondeur, des calques, du tramage et des passes de matière sans rien ajouter
+au renderer.
+
+**Ce que les tampons ne font pas.** Ils ne suivent pas `groundScale` : un
+sprite ne change pas de définition quand la caméra recule. Leurs tailles sont
+discrètes — on choisit un dessin, on n'interpole pas entre deux. Composer une
+grande forme se fait donc en **grappe** de dessins à taille normale, jamais en
+agrandissant un tampon, ce qui donnerait des pixels deux fois plus gros que le
+reste du sprite.
+
+`fire-ball` est la première recette montée ainsi, et la seule à ce jour ; les
+cinq autres sont encore projetées.
 
 ## Ce qui n'est pas dans le socle
 

@@ -138,7 +138,10 @@ export const windCuttingSpiral: SpellRecipe = {
   ],
   role: 'oneshot',
   duration: DURATION,
-  fps: 30,
+  // Douze images par seconde, comme le reste du catalogue : c'est la cadence
+  // des feuilles 16 bits, et elle oblige chaque image à porter un changement
+  // lisible au lieu de glisser d'un pixel.
+  fps: 12,
   canvas: { width: 384, height: 256 },
   pivot: { x: 188, y: 156 },
   defaultRange: 3.3,

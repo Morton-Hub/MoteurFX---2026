@@ -233,7 +233,10 @@ export const waterBreakingWave: SpellRecipe = {
   ],
   role: 'oneshot',
   duration: DURATION,
-  fps: 24,
+  // Douze images par seconde, comme le reste du catalogue : c'est la cadence
+  // des feuilles 16 bits, et elle oblige chaque image à porter un changement
+  // lisible au lieu de glisser d'un pixel.
+  fps: 12,
   canvas: { width: 344, height: 232 },
   pivot: { x: 169, y: 138 },
   defaultRange: 3.3,

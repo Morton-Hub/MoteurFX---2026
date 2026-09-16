@@ -143,6 +143,11 @@ export const lightningRuptureArc: SpellRecipe = {
   ],
   role: 'oneshot',
   duration: DURATION,
+  // Exception assumée, et la seule : la foudre est bâtie sur des fenêtres
+  // plus courtes qu'une image à 12 i/s — un arc qui apparaît et disparaît en
+  // 20 ms n'existerait tout simplement pas à cette cadence. Le cahier des
+  // charges l'autorise explicitement : « ne force pas tous les effets à 20
+  // images ». Les autres recettes sont à 12.
   fps: 30,
   canvas: { width: 304, height: 168 },
   pivot: { x: 161, y: 88 },

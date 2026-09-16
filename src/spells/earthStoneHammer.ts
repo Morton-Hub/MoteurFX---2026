@@ -110,7 +110,10 @@ export const earthStoneHammer: SpellRecipe = {
   ],
   role: 'oneshot',
   duration: DURATION,
-  fps: 24,
+  // Douze images par seconde, comme le reste du catalogue : c'est la cadence
+  // des feuilles 16 bits, et elle oblige chaque image à porter un changement
+  // lisible au lieu de glisser d'un pixel.
+  fps: 12,
   canvas: { width: 424, height: 224 },
   pivot: { x: 212, y: 122 },
   defaultRange: 3.3,
