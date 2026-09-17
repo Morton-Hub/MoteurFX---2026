@@ -91,7 +91,7 @@
       61
     ],
     "colors": 10,
-    "msPerFrame": 4.1
+    "msPerFrame": 3.5
   },
   {
     "id": "fire-dragon-pillar-m",
@@ -365,7 +365,7 @@
       28
     ],
     "colors": 6,
-    "msPerFrame": 0.7
+    "msPerFrame": 0.6
   },
   {
     "id": "ice-frost-garden-m",
@@ -447,7 +447,7 @@
       61
     ],
     "colors": 6,
-    "msPerFrame": 1.3
+    "msPerFrame": 1.2
   },
   {
     "id": "ice-boreal-cathedral-l",

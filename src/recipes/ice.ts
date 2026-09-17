@@ -12,8 +12,9 @@
 
 import { add3, clamp01, norm3, scale3, type Vec3 } from '../core/math.js';
 import { getMaterial } from '../pixels/palette.js';
-import { paintRole } from '../pixels/shade.js';
+import { paintContactShade, paintOutline, paintRim, paintRole } from '../pixels/shade.js';
 import { ICE_FLAKE, ICE_FRACTURE, ICE_MOTE, ICE_SHARD, FROST_PATCH } from '../motifs/index.js';
+import { archPoints, planeRibbon } from '../geometry/band.js';
 import { prism } from '../geometry/forms.js';
 import { paintSolidObject } from '../geometry/solid.js';
 import { groundCracks, paintGroundMark } from '../geometry/ground.js';
@@ -65,6 +66,45 @@ function prismPiece(
         contact: 'deep',
         ...(o.bias !== undefined ? { bias: o.bias } : {}),
       });
+    },
+  };
+}
+
+
+/**
+ * Arche de glace : une nervure continue tracée dans le plan face caméra, puis
+ * ombrée comme un solide — corps, liseré côté lumière, ombre de contact,
+ * contour. Elle peut être coupée en tronçons (`from`, `to`) pour se rompre.
+ */
+function archPiece(
+  ctx: FrameContext,
+  o: {
+    id: string;
+    anchor: Vec3;
+    halfWidth: number;
+    height: number;
+    thickness: number;
+    from?: number;
+    to?: number;
+    bias?: number;
+  },
+): Piece {
+  const points = archPoints(o.halfWidth, o.height, 12, o.from ?? 0, o.to ?? 1);
+  const widths = points.map((_, i) => {
+    const k = i / Math.max(1, points.length - 1);
+    // Plus épaisse aux naissances qu'à la clé : une voûte porte par ses pieds.
+    return o.thickness * (1.15 - 0.35 * Math.sin(Math.PI * k));
+  });
+  const mask = planeRibbon(ctx, o.anchor, points, widths);
+  return {
+    id: o.id,
+    depth: ctx.depth({ x: o.anchor.x, y: o.anchor.y, z: o.height * 0.5 }),
+    paint: (canvas, c) => {
+      const material = getMaterial('ice.crystal');
+      paintRole(canvas, mask, material, 'body');
+      paintContactShade(canvas, mask, material, 'deep', c.lightScreen);
+      paintRim(canvas, mask, material, o.bias && o.bias > 0 ? 'light' : 'accent', c.lightScreen);
+      paintOutline(canvas, mask, material, c.style);
     },
   };
 }
@@ -604,6 +644,18 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       }
     }
     if (i >= 6) {
+      // L'arche elle-même : une nervure continue qui enjambe la cible. Sans
+      // elle, dix prismes penchés se lisent comme deux rangées de lames, pas
+      // comme une voûte refermée.
+      out.push(
+        archPiece(ctx, {
+          id: 'arch',
+          anchor: { x: centre.x, y: centre.y, z: 0 },
+          halfWidth: frontWidth * 0.5,
+          height: archHeight * 1.02,
+          thickness: ribRadius * 1.5,
+        }),
+      );
       // Clé de voûte : les deux rangées se rejoignent.
       for (let n = 0; n < ribs; n++) {
         const along = ((n + 0.5) / ribs - 0.5) * frontWidth;
@@ -660,6 +712,22 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
           }),
         );
       }
+    }
+    // L'arche se rompt en son milieu : deux tronçons qui s'écartent, pas une
+    // disparition.
+    for (const [from, to, side] of [[0, 0.42 - 0.08 * k, -1], [0.58 + 0.08 * k, 1, 1]] as const) {
+      out.push(
+        archPiece(ctx, {
+          id: `arch-${side > 0 ? 'a' : 'b'}`,
+          anchor: { x: centre.x + fwd.x * 0, y: centre.y + fwd.y * 0, z: 0 },
+          halfWidth: frontWidth * 0.5,
+          height: archHeight * (1.02 - 0.06 * k),
+          thickness: ribRadius * (1.4 - 0.2 * k),
+          from,
+          to,
+          bias: 0.06 * k,
+        }),
+      );
     }
     out.push(
       motifPiece(ctx, {
