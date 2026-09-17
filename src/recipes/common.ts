@@ -21,17 +21,30 @@ export function piece(
   id: string,
   depth: number,
   paint: Piece['paint'],
-  layer?: Piece['layer'],
+  options: { layer?: Piece['layer']; plane?: Piece['plane'] } = {},
 ): Piece {
-  return layer ? { id, depth, paint, layer } : { id, depth, paint };
+  return {
+    id,
+    depth,
+    paint,
+    ...(options.layer ? { layer: options.layer } : {}),
+    ...(options.plane ? { plane: options.plane } : {}),
+  };
+}
+
+/** Décalque au sol : peint avant tout ce qui se tient dessus. */
+export function groundPiece(id: string, depth: number, paint: Piece['paint']): Piece {
+  return { id, depth, paint, plane: 'ground' };
 }
 
 /** Ombre portée au sol, tramée. Elle dit la hauteur du projectile. */
 export function shadowPiece(ctx: FrameContext, id: string, at: Vec3, radius: number, density = 0.5): Piece {
   return {
     id,
-    // L'ombre est au sol : sa profondeur est celle du sol, pas celle de l'objet.
-    depth: ctx.depth({ x: at.x, y: at.y, z: 0 }) - 0.5,
+    plane: 'ground',
+    // L'ombre est au sol, et sous tout le reste : elle est tramée, donc peinte
+    // après un décalque elle le perforerait.
+    depth: ctx.depth({ x: at.x, y: at.y, z: 0 }) - 3,
     paint: (canvas) => {
       paintGroundShadow(canvas, ctx, at, radius, { id, density });
     },
@@ -51,12 +64,15 @@ export function motifPiece(
     material?: MaterialId;
     roleShift?: number;
     depthBias?: number;
+    /** `ground` pour un décalque posé au sol : il passe sous les objets. */
+    plane?: Piece['plane'];
   },
 ): Piece {
   const screen = ctx.p(o.at);
   return {
     id: o.id,
     depth: ctx.depth(o.at) + (o.depthBias ?? 0),
+    ...(o.plane ? { plane: o.plane } : {}),
     paint: (canvas) => {
       drawMotif(
         canvas,

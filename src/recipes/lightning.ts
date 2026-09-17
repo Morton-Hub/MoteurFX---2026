@@ -18,7 +18,8 @@ import { boltForks, boltMask, boltNodes, boltPath, ionMask } from '../geometry/b
 import { paintGroundMark } from '../geometry/ground.js';
 import type { FrameContext } from '../renderer/context.js';
 import type { Piece } from '../renderer/piece.js';
-import { motifPiece, piece, scatterMotifs } from './common.js';
+import { groundPiece, motifPiece, piece, scatterMotifs } from './common.js';
+import { arcSparks, boltNova, forwardUp, groundGlow, staticMotes } from './fx.js';
 import type { ParamBag, ParamSpec } from './params.js';
 import type { SpellBuilder } from './types.js';
 
@@ -111,6 +112,13 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     out.push(
       motifPiece(ctx, { id: 'hand-node', motif: BOLT_NODE, at: hand, frame: i % 2, scale: 1 }),
     );
+    // La poussière est **attirée** vers la charge : l'air se vide avant que
+    // la décharge parte.
+    out.push(...staticMotes(ctx, { id: 'dust', centre: hand, t: 0.2 + 0.35 * i, count: 9, radius: 0.9 }));
+    out.push(...arcSparks(ctx, { id: 'pre-spark', at: hand, t: 0.2 + 0.3 * i, count: 3 + i, scale: 0.5 }));
+    if (i === 2) {
+      out.push(groundGlow(ctx, { id: 'glow', centre: ctx.target, radius: scorchRadius * 1.6, material: 'lightning.scorch', level: 0.3 }));
+    }
     return out;
   }
 
@@ -125,6 +133,9 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
           motifPiece(ctx, { id: `residual#${n}`, motif: ARC_SPARK, at: nodes[n] as Vec3, frame: 0 }),
         );
       }
+      // La coupure laisse le sol allumé : c'est ce qui rend le vide lisible.
+      out.push(...boltNova(ctx, { id: 'nova', centre: ctx.target, t: 0.75, radius: scorchRadius * 2.4, branches: 5 }));
+      out.push(...arcSparks(ctx, { id: 'cut-spark', at: hit, t: 0.6, count: 5, scale: 0.7 }));
       return out;
     }
     const { path, branches } = strike('main');
@@ -132,6 +143,21 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     out.push(boltPiece(ctx, { id: 'branches', paths: branches, at: middle, width: Math.max(1, width - 1), bias: -0.15 }));
     out.push(motifPiece(ctx, { id: 'hand-node', motif: BOLT_NODE, at: hand, frame: 0 }));
     out.push(motifPiece(ctx, { id: 'hit-node', motif: BOLT_NODE, at: hit, frame: i === 3 ? 0 : 1 }));
+    // À la connexion, la décharge court au sol et projette des étincelles vers
+    // l'avant du sort.
+    out.push(...boltNova(ctx, { id: 'nova', centre: ctx.target, t: i === 3 ? 0.15 : 0.5, radius: scorchRadius * 2.4, branches: 5 }));
+    out.push(
+      ...arcSparks(ctx, {
+        id: 'hit-spark',
+        at: hit,
+        t: i === 3 ? 0.12 : 0.45,
+        count: i === 3 ? 12 : 7,
+        scale: 0.9,
+        dir: forwardUp(ctx, 0.7),
+        spread: 1.4,
+      }),
+    );
+    out.push(...arcSparks(ctx, { id: 'hand-spark', at: hand, t: 0.3, count: 4, scale: 0.6 }));
     if (i === 4) {
       out.push(motifPiece(ctx, { id: 'fork-a', motif: BOLT_FORK, at: hit, frame: 0, flipX: true }));
     }
@@ -147,6 +173,9 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       out.push(boltPiece(ctx, { id: 'restrike', paths: [path], at: middle, width, bias: -0.08 }));
       out.push(boltPiece(ctx, { id: 'restrike-branch', paths: branches, at: middle, width: Math.max(1, width - 1), bias: -0.2 }));
       out.push(motifPiece(ctx, { id: 'hit-node', motif: BOLT_NODE, at: hit, frame: 1 }));
+      out.push(
+        ...arcSparks(ctx, { id: 'restrike-spark', at: hit, t: 0.15, count: 9, scale: 0.8, dir: forwardUp(ctx, 0.7), spread: 1.4 }),
+      );
     } else {
       out.push(
         ...scatterMotifs(ctx, {
@@ -164,13 +193,14 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     }
     if (scorchRadius > 0) {
       out.push(
-        piece('scorch', ctx.depth(ctx.target) - 2, (canvas, c) => {
+        groundPiece('scorch', ctx.depth(ctx.target) - 2.5, (canvas, c) => {
           paintGroundMark(canvas, c, ctx.target, scorchRadius, 'lightning.scorch', {
             id: 'scorch',
             density: 0.7,
           });
         }),
       );
+      out.push(...boltNova(ctx, { id: 'nova', centre: ctx.target, t: Math.min(1, 0.55 + 0.12 * k), radius: scorchRadius * 2.4, branches: 5 }));
     }
     return out;
   }
@@ -179,14 +209,14 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   const k = i - 10;
   if (scorchRadius > 0) {
     out.push(
-      piece('scorch', ctx.depth(ctx.target) - 2, (canvas, c) => {
+      groundPiece('scorch', ctx.depth(ctx.target) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, ctx.target, scorchRadius * (1 - 0.25 * k), 'lightning.scorch', {
           id: 'scorch',
           density: 0.6 - 0.25 * k,
         });
       }),
     );
-    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ctx.target, frame: 0, roleShift: -k }));
+    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ctx.target, frame: 0, roleShift: -k, plane: 'ground' }));
   }
   if (k === 0) {
     out.push(motifPiece(ctx, { id: 'last-arc', motif: ARC_SPARK, at: { ...hit, z: 0.35 }, frame: 1 }));
@@ -254,6 +284,7 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   };
 
   if (i <= 1) {
+    out.push(...staticMotes(ctx, { id: 'dust', centre: hand, t: 0.25 + 0.4 * i, count: 9, radius: 1 }));
     const { path, middle } = link(hand, targets[0] as Vec3, 'hop0');
     const mask = ionMask(ctx, [path], width + 1);
     out.push(
@@ -304,13 +335,37 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         }),
       );
       out.push(
-        piece(`mark#${k}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2, (canvas, c) => {
+        groundPiece(`mark#${k}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2.5, (canvas, c) => {
           paintGroundMark(canvas, c, { x: to.x, y: to.y, z: 0 }, 0.5, 'lightning.scorch', {
             id: `mark#${k}`,
             density: 0.6 - 0.12 * age,
           });
         }),
       );
+      // Chaque cible touchée reçoit sa couronne de branches et sa gerbe : le
+      // ricochet se lit comme trois impacts, pas comme un trait qui se promène.
+      out.push(
+        ...boltNova(ctx, {
+          id: `nova#${k}`,
+          centre: { x: to.x, y: to.y, z: 0 },
+          t: Math.min(1, 0.15 + 0.3 * age),
+          radius: hopSpread * 0.8,
+          branches: 4,
+        }),
+      );
+      if (age === 0) {
+        out.push(
+          ...arcSparks(ctx, {
+            id: `hop-spark#${k}`,
+            at: to,
+            t: fresh ? 0.12 : 0.4,
+            count: fresh ? 10 : 5,
+            scale: 0.9,
+            dir: forwardUp(ctx, 0.7),
+            spread: 1.5,
+          }),
+        );
+      }
     }
     return out;
   }
@@ -324,7 +379,7 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         motifPiece(ctx, { id: `node#${n}`, motif: BOLT_NODE, at: to, frame: 1, roleShift: -k }),
       );
       out.push(
-        piece(`mark#${n}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2, (canvas, c) => {
+        groundPiece(`mark#${n}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2.5, (canvas, c) => {
           paintGroundMark(canvas, c, { x: to.x, y: to.y, z: 0 }, 0.5, 'lightning.scorch', {
             id: `mark#${n}`,
             density: 0.6 - 0.15 * k,
@@ -345,6 +400,18 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         frame: () => k,
       }),
     );
+    for (let n = 0; n < hops; n++) {
+      const to = targets[n] as Vec3;
+      out.push(
+        ...boltNova(ctx, {
+          id: `nova#${n}`,
+          centre: { x: to.x, y: to.y, z: 0 },
+          t: Math.min(1, 0.6 + 0.2 * k),
+          radius: hopSpread * 0.8,
+          branches: 4,
+        }),
+      );
+    }
     return out;
   }
 
@@ -352,7 +419,7 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   for (let n = 0; n < hops; n++) {
     const to = targets[n] as Vec3;
     out.push(
-      piece(`mark#${n}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2, (canvas, c) => {
+      groundPiece(`mark#${n}`, ctx.depth({ x: to.x, y: to.y, z: 0 }) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, { x: to.x, y: to.y, z: 0 }, 0.5 - 0.1 * k, 'lightning.scorch', {
           id: `mark#${n}`,
           density: 0.5 - 0.2 * k,
@@ -441,13 +508,23 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       }),
     );
     out.push(
-      piece('pre-mark', ctx.depth(ground) - 2, (canvas, c) => {
+      groundPiece('pre-mark', ctx.depth(ground) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, ground, scorchRadius * (0.3 + 0.15 * i), 'lightning.scorch', {
           id: 'pre-mark',
           density: 0.4 + 0.1 * i,
         });
       }),
     );
+    // Tout ce qui traîne est aspiré vers le point de frappe : l'anticipation
+    // de la foudre, c'est l'air qui se charge.
+    out.push(
+      ...staticMotes(ctx, { id: 'dust', centre: ground, t: 0.2 + 0.35 * i, count: 14, radius: scorchRadius * 1.6 }),
+    );
+    if (i >= 1) {
+      out.push(
+        ...arcSparks(ctx, { id: 'pre-spark', at: { ...ground, z: 0.3 }, t: 0.3 * i, count: 3 + 2 * i, scale: scorchRadius }),
+      );
+    }
     return out;
   }
 
@@ -465,14 +542,34 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     }
     out.push(motifPiece(ctx, { id: 'impact-node', motif: BOLT_NODE, at: { ...ground, z: 0.15 }, frame: hold === 0 ? 0 : 1, scale: 2 }));
     out.push(
-      piece('mark', ctx.depth(ground) - 2, (canvas, c) => {
+      ...boltNova(ctx, {
+        id: 'nova',
+        centre: ground,
+        t: i === 3 ? 0.18 : i === 4 ? 0.45 : 0.7,
+        radius: scorchRadius * 1.25,
+        branches: branchCount + 2,
+      }),
+    );
+    out.push(
+      ...arcSparks(ctx, {
+        id: 'strike-spark',
+        at: { ...ground, z: 0.2 },
+        t: i === 3 ? 0.1 : i === 4 ? 0.35 : 0.6,
+        count: i === 3 ? 22 : 12,
+        scale: scorchRadius * 1.15,
+        dir: forwardUp(ctx, 0.9),
+        spread: 1.5,
+      }),
+    );
+    out.push(
+      groundPiece('mark', ctx.depth(ground) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, ground, scorchRadius * (0.75 + 0.12 * hold), 'lightning.scorch', {
           id: 'mark',
           density: 0.85,
         });
       }),
     );
-    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0 }));
+    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0, plane: 'ground' }));
     return out;
   }
 
@@ -483,11 +580,11 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     const paths = groundBranches('run', extent);
     const alive = k < 2 ? paths : paths.slice(0, Math.max(1, branchCount - 2 * (k - 1)));
     out.push(
-      piece('mark', ctx.depth(ground) - 2, (canvas, c) => {
+      groundPiece('mark', ctx.depth(ground) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, ground, scorchRadius, 'lightning.scorch', { id: 'mark', density: 0.85 - 0.1 * k });
       }),
     );
-    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0, roleShift: -Math.floor(k / 2) }));
+    out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0, roleShift: -Math.floor(k / 2), plane: 'ground' }));
     out.push(
       boltPiece(ctx, {
         id: 'run',
@@ -497,6 +594,20 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         bias: -0.1 * k,
         ceiling: 1 - 0.14 * k,
         depthBias: 0.5,
+      }),
+    );
+    out.push(
+      ...boltNova(ctx, { id: 'nova', centre: ground, t: Math.min(1, 0.7 + 0.1 * k), radius: scorchRadius * 1.25, branches: branchCount + 2 }),
+    );
+    out.push(
+      ...arcSparks(ctx, {
+        id: 'run-spark',
+        at: { ...ground, z: 0.15 },
+        t: 0.3 + 0.2 * k,
+        count: Math.max(3, 10 - 2 * k),
+        scale: scorchRadius * 1.1,
+        dir: forwardUp(ctx, 0.5),
+        spread: 1.6,
       }),
     );
     if (k === 0) {
@@ -522,19 +633,19 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   // Résidu : la marque et deux branches faibles, puis plus rien.
   const k = i - 10;
   out.push(
-    piece('mark', ctx.depth(ground) - 2, (canvas, c) => {
+    groundPiece('mark', ctx.depth(ground) - 2.5, (canvas, c) => {
       paintGroundMark(canvas, c, ground, scorchRadius * (1 - 0.2 * k), 'lightning.scorch', {
         id: 'mark',
         density: 0.6 - 0.25 * k,
       });
     }),
   );
-  out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0, roleShift: -1 - k }));
+  out.push(motifPiece(ctx, { id: 'ground-arc', motif: GROUND_ARC, at: ground, frame: 0, roleShift: -1 - k, plane: 'ground' }));
   if (k === 0) {
     const paths = groundBranches('rest', 0.7).slice(0, 2);
     const mask = boltMask(ctx, paths, 1, 0.3);
     out.push(
-      piece('rest', ctx.depth(ground) + 0.5, (canvas) => {
+      groundPiece('rest', ctx.depth(ground) + 0.5, (canvas) => {
         paintRole(canvas, mask, getMaterial('lightning.ion'), 'body');
       }),
     );

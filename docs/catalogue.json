@@ -83,15 +83,15 @@
       }
     ],
     "canvas": [
-      160,
-      120
+      184,
+      144
     ],
     "silhouettePx": [
-      75,
-      61
+      79,
+      62
     ],
-    "colors": 10,
-    "msPerFrame": 3.5
+    "colors": 8,
+    "msPerFrame": 4.2
   },
   {
     "id": "fire-dragon-pillar-m",
@@ -165,15 +165,15 @@
       }
     ],
     "canvas": [
-      144,
-      176
+      168,
+      192
     ],
     "silhouettePx": [
-      114,
-      92
+      110,
+      90
     ],
     "colors": 9,
-    "msPerFrame": 1.8
+    "msPerFrame": 2.4
   },
   {
     "id": "fire-comet-heart-l",
@@ -263,15 +263,15 @@
       }
     ],
     "canvas": [
-      176,
-      200
+      216,
+      224
     ],
     "silhouettePx": [
-      113,
-      131
+      157,
+      144
     ],
-    "colors": 12,
-    "msPerFrame": 2.3
+    "colors": 14,
+    "msPerFrame": 3.1
   },
   {
     "id": "ice-aurora-needle-s",
@@ -357,15 +357,15 @@
       }
     ],
     "canvas": [
-      160,
-      120
+      184,
+      144
     ],
     "silhouettePx": [
-      49,
-      28
+      101,
+      64
     ],
-    "colors": 6,
-    "msPerFrame": 0.6
+    "colors": 7,
+    "msPerFrame": 0.8
   },
   {
     "id": "ice-frost-garden-m",
@@ -439,15 +439,15 @@
       }
     ],
     "canvas": [
-      144,
-      120
+      176,
+      152
     ],
     "silhouettePx": [
-      73,
-      61
+      105,
+      75
     ],
     "colors": 6,
-    "msPerFrame": 1.2
+    "msPerFrame": 1.5
   },
   {
     "id": "ice-boreal-cathedral-l",
@@ -521,15 +521,15 @@
       }
     ],
     "canvas": [
-      176,
-      144
+      216,
+      184
     ],
     "silhouettePx": [
-      95,
-      84
+      126,
+      116
     ],
     "colors": 6,
-    "msPerFrame": 1.9
+    "msPerFrame": 3.4
   },
   {
     "id": "lightning-storm-thread-s",
@@ -607,15 +607,15 @@
       }
     ],
     "canvas": [
-      168,
-      120
+      192,
+      144
     ],
     "silhouettePx": [
-      58,
-      36
+      76,
+      52
     ],
     "colors": 6,
-    "msPerFrame": 0.8
+    "msPerFrame": 1.1
   },
   {
     "id": "lightning-ionic-ricochet-m",
@@ -689,15 +689,15 @@
       }
     ],
     "canvas": [
-      208,
-      136
+      232,
+      160
     ],
     "silhouettePx": [
-      69,
-      56
+      81,
+      64
     ],
     "colors": 6,
-    "msPerFrame": 1
+    "msPerFrame": 1.3
   },
   {
     "id": "lightning-thunder-crown-l",
@@ -775,14 +775,14 @@
       }
     ],
     "canvas": [
-      176,
-      192
+      208,
+      208
     ],
     "silhouettePx": [
       92,
-      101
+      120
     ],
     "colors": 6,
-    "msPerFrame": 0.9
+    "msPerFrame": 1.3
   }
 ]

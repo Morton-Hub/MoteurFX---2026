@@ -13,7 +13,7 @@
 import { add3, clamp01, norm3, scale3, type Vec3 } from '../core/math.js';
 import { getMaterial } from '../pixels/palette.js';
 import { paintContactShade, paintOutline, paintRim, paintRole } from '../pixels/shade.js';
-import { ICE_FLAKE, ICE_FRACTURE, ICE_MOTE, ICE_SHARD, FROST_PATCH } from '../motifs/index.js';
+import { ICE_FLAKE, ICE_FRACTURE, ICE_SHARD, FROST_PATCH } from '../motifs/index.js';
 import { archPoints, planeRibbon } from '../geometry/band.js';
 import { prism } from '../geometry/forms.js';
 import { paintSolidObject } from '../geometry/solid.js';
@@ -21,7 +21,8 @@ import { groundCracks, paintGroundMark } from '../geometry/ground.js';
 import { lineTrajectory } from '../geometry/paths.js';
 import type { FrameContext } from '../renderer/context.js';
 import type { Piece } from '../renderer/piece.js';
-import { motifPiece, piece, scatterMotifs, shadowPiece } from './common.js';
+import { groundPiece, motifPiece, shadowPiece } from './common.js';
+import { converge, forwardUp, frostMotes, frostNova, glints, mist, shards } from './fx.js';
 import type { ParamBag, ParamSpec } from './params.js';
 import type { SpellBuilder } from './types.js';
 
@@ -159,20 +160,25 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         roll: 0.4,
       }),
     );
-    // Poudrin d'accompagnement : rare, et il ne remplace pas la silhouette.
+    // Le givre se rassemble avant que le prisme existe : c'est l'anticipation
+    // de la glace, l'air qui se charge d'humidité.
     out.push(
-      ...scatterMotifs(ctx, {
-        id: 'mote',
-        motif: ICE_MOTE,
-        center: base,
-        count: i + 1,
-        radius: 0.4,
-        spread: 0.5 + 0.2 * i,
-        lift: 0.3,
-        gravity: 0.2,
-        frame: () => (i === 2 ? 1 : 0),
+      ...converge(ctx, {
+        id: 'gather',
+        centre: base,
+        t: [0.15, 0.6, 1][i] ?? 1,
+        count: 7 - i,
+        radius: length * 1.6,
+        material: 'ice.mist',
+        lift: length * 0.6,
       }),
     );
+    out.push(...frostMotes(ctx, { id: 'mote', at: base, t: 0.2 + 0.3 * i, count: 4 + i, scale: length * 0.8 }));
+    if (i === 2) {
+      // Un éclat de lumière sur l'arête : l'accent le plus économique du
+      // pixel art, et il tient une seule image.
+      out.push(...glints(ctx, { id: 'glint', points: [add3(base, scale3(axis, length * 0.35))], size: 2 }));
+    }
     return out;
   }
 
@@ -192,18 +198,19 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         roll: 0.4,
       }),
     );
-    // Traînée : deux poudrins qui finissent leur mouvement derrière la pointe.
-    for (let k = 1; k <= 2; k++) {
-      const back = path.at(Math.max(0, t - 0.12 * k));
-      out.push(
-        motifPiece(ctx, {
-          id: `wake#${k}`,
-          motif: ICE_MOTE,
-          at: add3(back, { x: 0, y: 0, z: 0.05 * k }),
-          frame: k - 1,
-        }),
-      );
-    }
+    // Traînée : du poudrin semé le long du trajet, qui finit son mouvement
+    // derrière la pointe.
+    out.push(
+      ...frostMotes(ctx, {
+        id: 'wake',
+        at: (birth) => path.at(Math.max(0, Math.min(1, birth))),
+        t,
+        birth: [0.05, t],
+        count: 9,
+        scale: radius * 5,
+        spread: 1.2,
+      }),
+    );
     return out;
   }
 
@@ -225,9 +232,25 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     out.push(
       motifPiece(ctx, { id: 'fracture', motif: ICE_FRACTURE, at: impact, frame: 0, scale: 2 }),
     );
+    // La glace ne souffle pas : elle cristallise. L'onde au sol est faite de
+    // pointes qui poussent, et la gerbe part vers l'avant du sort.
+    out.push(...frostNova(ctx, { id: 'nova', centre: ctx.target, t: 0.15, radius: frostRadius * 2.2, spikes: 9 }));
+    out.push(
+      ...shards(ctx, {
+        id: 'spray',
+        at: impact,
+        t: 0.16,
+        count: 14,
+        scale: radius * 5,
+        dir: forwardUp(ctx, 1),
+        spread: 1.3,
+      }),
+    );
+    out.push(...frostMotes(ctx, { id: 'burst-mote', at: impact, t: 0.12, count: 9, scale: radius * 4 }));
+    out.push(...glints(ctx, { id: 'glint', points: [impact], size: 3 }));
     const cracks = groundCracks(ctx, ctx.target, { id: 'ice-cracks', seed: ctx.seed, count: 3, length: frostRadius * 0.8, width: 1, angleOffset: ctx.heading });
     out.push(
-      piece('ice-cracks', ctx.depth(ctx.target) - 1, (canvas) => {
+      groundPiece('ice-cracks', ctx.depth(ctx.target) - 1.5, (canvas) => {
         paintRole(canvas, cracks, getMaterial('ice.frost'), 'light');
       }),
     );
@@ -252,9 +275,22 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         roll: 0.4,
       }),
     );
+    out.push(...frostNova(ctx, { id: 'nova', centre: ctx.target, t: 0.45 + 0.35 * k, radius: frostRadius * 2.2, spikes: 9 }));
+    out.push(
+      ...shards(ctx, {
+        id: 'spray',
+        at: impact,
+        t: 0.4 + 0.3 * k,
+        count: 10,
+        scale: radius * 5,
+        dir: forwardUp(ctx, 1),
+        spread: 1.3,
+      }),
+    );
+    out.push(...frostMotes(ctx, { id: 'burst-mote', at: impact, t: 0.36 + 0.3 * k, count: 6, scale: radius * 4 }));
     for (let f = 0; f < fragmentCount; f++) {
       const gid = `shard#${f}`;
-      const a = ctx.rnd(gid, 1) * Math.PI * 2;
+      const a = ctx.heading + ctx.rnd(gid, 1) * Math.PI * 2;
       const rise = 0.35 + 0.5 * ctx.rnd(gid, 2);
       const dist = (0.35 + 0.8 * ctx.rnd(gid, 3)) * (0.5 + 0.6 * k);
       const at: Vec3 = {
@@ -272,6 +308,9 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         }),
       );
     }
+    if (k === 1) {
+      out.push(...mist(ctx, { id: 'mist', at: { ...ctx.target, z: 0.05 }, t: 0.2, count: 5, scale: frostRadius * 0.7 }));
+    }
     return out;
   }
 
@@ -279,7 +318,7 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   const k = i - 9;
   if (frostRadius > 0) {
     out.push(
-      piece('frost', ctx.depth(ctx.target) - 2, (canvas, c) => {
+      groundPiece('frost', ctx.depth(ctx.target) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, ctx.target, frostRadius * (1 - 0.15 * k), 'ice.frost', {
           id: 'frost',
           core: 'light',
@@ -295,12 +334,25 @@ function needleBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         at: ctx.target,
         frame: k === 0 ? 1 : 0,
         roleShift: -k,
+        plane: 'ground',
       }),
     );
   }
+  out.push(
+    ...mist(ctx, {
+      id: 'mist',
+      at: { ...ctx.target, z: 0.05 },
+      t: Math.min(1, 0.45 + 0.3 * k),
+      count: 7,
+      scale: frostRadius * 0.8,
+    }),
+  );
+  out.push(
+    ...frostMotes(ctx, { id: 'rest-mote', at: { ...impact, z: 0.2 }, t: 0.6 + 0.25 * k, count: 6, scale: frostRadius }),
+  );
   for (let f = 0; f < Math.max(0, fragmentCount - 1 - k); f++) {
     const gid = `shard#${f}`;
-    const a = ctx.rnd(gid, 1) * Math.PI * 2;
+    const a = ctx.heading + ctx.rnd(gid, 1) * Math.PI * 2;
     const dist = (0.35 + 0.8 * ctx.rnd(gid, 3)) * (1.1 + 0.15 * k);
     out.push(
       motifPiece(ctx, {
@@ -356,7 +408,7 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
 
   const frost = (scale: number, density: number, shift = 0): void => {
     out.push(
-      piece('frost', ctx.depth(centre) - 2, (canvas, c) => {
+      groundPiece('frost', ctx.depth(centre) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, centre, spread * scale, 'ice.frost', {
           id: 'frost',
           core: 'body',
@@ -365,7 +417,9 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         });
       }),
     );
-    out.push(motifPiece(ctx, { id: 'frost-star', motif: FROST_PATCH, at: centre, frame: 1, roleShift: shift }));
+    // Le motif de givre est un décalque : il se pose **sous** ce qui se tient
+    // dessus, sinon il découpe les prismes en fragments.
+    out.push(motifPiece(ctx, { id: 'frost-star', motif: FROST_PATCH, at: centre, frame: 1, roleShift: shift, plane: 'ground' }));
   };
 
   // Position et inclinaison d'un prisme de la couronne. Chaque prisme a son
@@ -383,6 +437,18 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
 
   if (i <= 2) {
     frost(0.45 + 0.28 * i, 0.5 + 0.15 * i);
+    out.push(
+      ...converge(ctx, {
+        id: 'gather',
+        centre: { ...centre, z: 0.2 },
+        t: [0.15, 0.55, 0.95][i] ?? 1,
+        count: 9 - i,
+        radius: spread * 2.4,
+        material: 'ice.mist',
+        lift: height * 0.5,
+      }),
+    );
+    out.push(...mist(ctx, { id: 'mist', at: centre, t: 0.15 + 0.25 * i, count: 4 + i, scale: spread * 0.8 }));
     if (i >= 1) {
       // Les premières pointes percent la plaque : croissance par paliers.
       for (let k = 0; k < count; k++) {
@@ -428,20 +494,29 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         }),
       );
     }
+    // Le givre monte le long des fûts pendant toute la croissance.
+    out.push(
+      ...frostMotes(ctx, {
+        id: 'mote',
+        at: (birth) => ({ x: centre.x, y: centre.y, z: 0.1 + height * 0.6 * birth }),
+        t: 0.2 + 0.16 * (i - 3),
+        birth: [0, 0.7],
+        count: 10,
+        scale: spread,
+        spread: 1.2,
+      }),
+    );
     if (i >= 6) {
-      out.push(
-        ...scatterMotifs(ctx, {
-          id: 'mote',
-          motif: ICE_MOTE,
-          center: { x: centre.x, y: centre.y, z: height * 0.8 },
-          count: 4,
-          radius: spread * 1.2,
-          spread: 0.4 + 0.3 * (i - 6),
-          lift: 0.3,
-          gravity: 0.15,
-          frame: () => (i === 7 ? 1 : 0),
-        }),
-      );
+      // Couronne complète : l'onde de gel court au sol et les arêtes accrochent
+      // la lumière. C'est le climax de la glace — net, pas explosif.
+      out.push(...frostNova(ctx, { id: 'nova', centre, t: 0.3 + 0.45 * (i - 6), radius: spread * 2.1, spikes: 10 }));
+      const tips: Vec3[] = [];
+      for (let k = 0; k < Math.min(4, count); k++) {
+        const { base, axis } = prismAt(k);
+        tips.push({ x: base.x + axis.x * height * 0.8, y: base.y + axis.y * height * 0.8, z: height * 0.85 });
+      }
+      out.push(...glints(ctx, { id: 'glint', points: tips, size: i === 6 ? 2 : 1 }));
+      out.push(...mist(ctx, { id: 'mist', at: centre, t: 0.3 + 0.3 * (i - 6), count: 6, scale: spread }));
     }
     return out;
   }
@@ -466,6 +541,19 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         }),
       );
     }
+    out.push(...frostNova(ctx, { id: 'nova', centre, t: 0.8 + 0.2 * k, radius: spread * 2.1, spikes: 10 }));
+    out.push(
+      ...shards(ctx, {
+        id: 'spray',
+        at: { ...centre, z: height * 0.7 },
+        t: 0.25 + 0.3 * k,
+        count: 9,
+        scale: spread * 1.6,
+        dir: { x: 0, y: 0, z: 1 },
+        spread: 1.4,
+      }),
+    );
+    out.push(...frostMotes(ctx, { id: 'break-mote', at: { ...centre, z: height * 0.6 }, t: 0.3 + 0.3 * k, count: 6, scale: spread }));
     for (let f = 0; f < shatterCount; f++) {
       const gid = `frag#${f}`;
       const a = ctx.heading + ctx.rnd(gid, 1) * Math.PI * 2;
@@ -484,9 +572,11 @@ function gardenBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     return out;
   }
 
-  // Résidu : souches basses, éclats au sol, givre qui se retire.
+  // Résidu : souches basses, éclats au sol, brume rasante qui s'étale.
   const k = i - 10;
   frost(1 - 0.2 * k, 0.75 - 0.25 * k, -k);
+  out.push(...mist(ctx, { id: 'mist', at: centre, t: Math.min(1, 0.5 + 0.3 * k), count: 8, scale: spread * 1.1 }));
+  out.push(...frostMotes(ctx, { id: 'rest-mote', at: { ...centre, z: height * 0.4 }, t: 0.65 + 0.25 * k, count: 7, scale: spread }));
   for (let n = 0; n < count; n++) {
     const { base, axis, roll } = prismAt(n);
     if (ctx.rnd(`prism#${n}`, 7) < 0.3 * (k + 1)) continue;
@@ -584,7 +674,7 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       z: 0,
     };
     out.push(
-      piece('front', ctx.depth(at) - 2, (canvas, c) => {
+      groundPiece('front', ctx.depth(at) - 2.5, (canvas, c) => {
         paintGroundMark(canvas, c, at, frontWidth * 0.45 * (0.5 + advance), 'ice.frost', {
           id: 'front',
           core: 'body',
@@ -593,13 +683,31 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         });
       }),
     );
-    out.push(motifPiece(ctx, { id: 'front-star', motif: FROST_PATCH, at, frame: 1 }));
+    out.push(motifPiece(ctx, { id: 'front-star', motif: FROST_PATCH, at, frame: 1, plane: 'ground' }));
   };
 
   if (i <= 2) {
-    // Front de gel : il avance au sol, il ne tombe pas du ciel.
+    // Front de gel : il avance au sol, il ne tombe pas du ciel. La brume le
+    // précède — on voit arriver le froid avant de voir la glace.
     const advance = [0.25, 0.55, 0.85][i] ?? 1;
     frontMark(advance, 0.55 + 0.12 * i);
+    const frontAt: Vec3 = {
+      x: centre.x - fwd.x * (1 - advance) * frontWidth * 0.5,
+      y: centre.y - fwd.y * (1 - advance) * frontWidth * 0.5,
+      z: 0.05,
+    };
+    out.push(
+      ...mist(ctx, {
+        id: 'front-mist',
+        at: frontAt,
+        t: 0.2 + 0.3 * i,
+        count: 6 + i * 2,
+        scale: frontWidth * 0.5,
+        dir: { x: fwd.x, y: fwd.y, z: 0.15 },
+        spread: 1.1,
+      }),
+    );
+    out.push(...frostMotes(ctx, { id: 'front-mote', at: frontAt, t: 0.25 + 0.3 * i, count: 6, scale: frontWidth * 0.5 }));
     const spikes = Math.max(1, Math.round(ribs * advance));
     for (let n = 0; n < spikes; n++) {
       const { gid, base, axis, roll } = rib(n, n % 2 === 0 ? 1 : -1);
@@ -643,6 +751,17 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         );
       }
     }
+    out.push(
+      ...frostMotes(ctx, {
+        id: 'rise-mote',
+        at: (birth) => ({ x: centre.x, y: centre.y, z: 0.1 + archHeight * 0.7 * birth }),
+        t: 0.2 + 0.16 * (i - 3),
+        birth: [0, 0.7],
+        count: 8,
+        scale: frontWidth * 0.5,
+        spread: 1.3,
+      }),
+    );
     if (i >= 6) {
       // L'arche elle-même : une nervure continue qui enjambe la cible. Sans
       // elle, dix prismes penchés se lisent comme deux rangées de lames, pas
@@ -674,19 +793,14 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
           }),
         );
       }
-      out.push(
-        ...scatterMotifs(ctx, {
-          id: 'mote',
-          motif: ICE_MOTE,
-          center: { x: centre.x, y: centre.y, z: archHeight * 0.7 },
-          count: 5,
-          radius: frontWidth * 0.5,
-          spread: 0.4 + 0.25 * (i - 6),
-          lift: 0.2,
-          gravity: 0.1,
-          frame: () => (i === 7 ? 1 : 0),
-        }),
-      );
+      out.push(...frostNova(ctx, { id: 'nova', centre, t: 0.3 + 0.45 * (i - 6), radius: frontWidth * 1.1, spikes: 12 }));
+      const keys: Vec3[] = [];
+      for (let n = 0; n < Math.min(4, ribs); n++) {
+        const along = ((n + 0.5) / ribs - 0.5) * frontWidth;
+        keys.push({ x: centre.x + fwd.x * along, y: centre.y + fwd.y * along, z: archHeight * 0.95 });
+      }
+      out.push(...glints(ctx, { id: 'glint', points: keys, size: i === 6 ? 3 : 2 }));
+      out.push(...mist(ctx, { id: 'mist', at: centre, t: 0.3 + 0.3 * (i - 6), count: 5, scale: frontWidth * 0.6 }));
     }
     return out;
   }
@@ -737,6 +851,27 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         frame: k,
       }),
     );
+    out.push(...frostNova(ctx, { id: 'nova', centre, t: 0.8 + 0.2 * k, radius: frontWidth * 1.1, spikes: 9 }));
+    out.push(
+      ...shards(ctx, {
+        id: 'spray',
+        at: { x: centre.x, y: centre.y, z: archHeight * 0.8 },
+        t: 0.22 + 0.3 * k,
+        count: 10,
+        scale: frontWidth * 0.9,
+        dir: { x: 0, y: 0, z: 0.4 },
+        spread: 1.5,
+      }),
+    );
+    out.push(
+      ...frostMotes(ctx, {
+        id: 'break-mote',
+        at: { x: centre.x, y: centre.y, z: archHeight * 0.7 },
+        t: 0.3 + 0.3 * k,
+        count: 8,
+        scale: frontWidth * 0.6,
+      }),
+    );
     for (let f = 0; f < shatterCount; f++) {
       const gid = `frag#${f}`;
       const a = ctx.rnd(gid, 1) * Math.PI * 2;
@@ -755,9 +890,13 @@ function cathedralBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     return out;
   }
 
-  // Résidu : souches et éclats plats, givre qui se retire.
+  // Résidu : souches et éclats plats, brume qui reste au sol.
   const k = i - 10;
   frontMark(1, 0.7 - 0.25 * k);
+  out.push(...mist(ctx, { id: 'mist', at: centre, t: Math.min(1, 0.5 + 0.3 * k), count: 9, scale: frontWidth * 0.7 }));
+  out.push(
+    ...frostMotes(ctx, { id: 'rest-mote', at: { x: centre.x, y: centre.y, z: archHeight * 0.4 }, t: 0.65 + 0.25 * k, count: 8, scale: frontWidth * 0.5 }),
+  );
   for (const sign of [1, -1] as const) {
     for (let n = 0; n < ribs; n++) {
       const { gid, base, axis, roll } = rib(n, sign);

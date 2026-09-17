@@ -67,15 +67,29 @@ export function paintValue(
   canvas.fillMask(mask, (x, y) => (ditherPasses(dither, x, y) ? ink : 0));
 }
 
-/** Peint un masque avec un rôle explicite. */
+/**
+ * Peint un masque avec un rôle explicite.
+ *
+ * `behind` ne pose l'encre que sur les pixels encore vides. C'est
+ * indispensable pour une matière **tramée** : posée par-dessus, elle laisse
+ * apparaître un pixel sur deux de ce qui était dessous, et perfore la matière
+ * en damier au lieu de la voiler.
+ */
 export function paintRole(
   canvas: IndexedCanvas,
   mask: ShapeMask,
   material: Material,
   role: RoleId,
   dither?: Dither,
+  behind = false,
 ): void {
   const ink = canvas.ink(material, role);
+  if (behind) {
+    mask.forEach((x, y) => {
+      if (ditherPasses(dither, x, y)) canvas.setBehind(x, y, ink);
+    });
+    return;
+  }
   canvas.fillMask(mask, (x, y) => (ditherPasses(dither, x, y) ? ink : 0));
 }
 

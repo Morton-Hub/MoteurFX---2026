@@ -66,7 +66,7 @@ export const FIRE_S: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 160, height: 120, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.52, y: 0.6 } },
+  stage: { width: 184, height: 144, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.52, y: 0.6 } },
   silhouette:
     'Une petite masse crochue, lancée à hauteur de main, qui s’ouvre en trois pétales au contact et laisse des braises.',
 };
@@ -109,7 +109,7 @@ export const FIRE_M: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 144, height: 176, distance: 2.2, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.8 } },
+  stage: { width: 168, height: 192, distance: 2.2, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.78 } },
   silhouette:
     'Une colonne verticale qui jaillit du sol, tient sa pose ouverte, puis se déchire en deux quand le débit est coupé.',
 };
@@ -165,7 +165,7 @@ export const FIRE_L: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 176, height: 200, distance: 1.2, casterHeight: 0.55, targetAt: { x: 0.46, y: 0.76 } },
+  stage: { width: 216, height: 224, distance: 1.2, casterHeight: 0.55, targetAt: { x: 0.46, y: 0.74 } },
   silhouette:
     'Une masse rocheuse à croûte sombre et veines chaudes, annoncée par son ombre, qui tombe du ciel et se disloque en fragments lourds.',
 };
@@ -221,7 +221,7 @@ export const ICE_S: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 160, height: 120, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.52, y: 0.6 } },
+  stage: { width: 184, height: 144, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.52, y: 0.6 } },
   silhouette:
     'Un prisme rigide construit par paliers, projeté dans l’axe du cap, qui casse net en facettes plates.',
 };
@@ -244,7 +244,7 @@ export const ICE_M: RecipeDefinition = {
     prismRadius: 0.22,
     spread: 1.05,
     growthSteps: 3,
-    shatterCount: 6,
+    shatterCount: 5,
   },
   animation: {
     frameCount: 12,
@@ -271,7 +271,7 @@ export const ICE_M: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 144, height: 120, distance: 2.2, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.76 } },
+  stage: { width: 176, height: 152, distance: 2.2, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.74 } },
   silhouette:
     'Une couronne de prismes obliques qui pousse par paliers autour de la cible, tient, puis se rompt vers l’extérieur.',
 };
@@ -294,7 +294,7 @@ export const ICE_L: RecipeDefinition = {
     ribs: 5,
     ribRadius: 0.26,
     closure: 0.85,
-    shatterCount: 9,
+    shatterCount: 6,
   },
   animation: {
     frameCount: 12,
@@ -321,7 +321,7 @@ export const ICE_L: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 176, height: 144, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.78 } },
+  stage: { width: 216, height: 184, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.5, y: 0.74 } },
   silhouette:
     'Un front de gel qui avance au sol, lève deux rangées de nervures et referme une arche au-dessus de la cible avant de la briser.',
 };
@@ -369,7 +369,7 @@ export const LIGHTNING_S: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 168, height: 120, distance: 2.8, casterHeight: 0.6, targetAt: { x: 0.52, y: 0.62 } },
+  stage: { width: 192, height: 144, distance: 2.8, casterHeight: 0.6, targetAt: { x: 0.52, y: 0.6 } },
   silhouette:
     'Une couture lumineuse brisée entre deux attaches : connexion brusque, pose tenue, coupure, reprise.',
 };
@@ -412,7 +412,7 @@ export const LIGHTNING_M: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 208, height: 136, distance: 2.4, casterHeight: 0.6, targetAt: { x: 0.5, y: 0.62 } },
+  stage: { width: 232, height: 160, distance: 2.4, casterHeight: 0.6, targetAt: { x: 0.5, y: 0.6 } },
   silhouette:
     'Un arc qui saute entre trois cibles : chaque saut a son nœud, sa pose tenue et sa coupure.',
 };
@@ -456,7 +456,7 @@ export const LIGHTNING_L: RecipeDefinition = {
     bodyProfile: 'pixel-light',
     separateEmission: true,
   },
-  stage: { width: 176, height: 192, distance: 1.4, casterHeight: 0.6, targetAt: { x: 0.5, y: 0.78 } },
+  stage: { width: 208, height: 208, distance: 1.4, casterHeight: 0.6, targetAt: { x: 0.5, y: 0.76 } },
   silhouette:
     'Une colonne céleste qui frappe la cible puis distribue des branches interrompues sur le sol.',
 };
