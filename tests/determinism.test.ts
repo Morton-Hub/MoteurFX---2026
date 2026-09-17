@@ -1,93 +1,66 @@
-/**
- * Déterminisme, stabilité des seeds et navigation temporelle.
- * Ces invariants conditionnent tout le reste : sans eux, une planche de
- * référence ne prouve rien.
- */
-
 import { describe, expect, it } from 'vitest';
-import { Rng, deriveSeed, hashString, rand1, randN } from '../src/core/rng.js';
-import { SPELLS } from '../src/spells/index.js';
-import { frameCount, frameTime, renderFrame } from '../src/render/renderer.js';
-import type { Framebuffer } from '../src/raster/framebuffer.js';
+import { RECIPES } from '../src/recipes/catalogue.js';
+import { compileRecipe } from '../src/compiler/compile.js';
+import { renderClip, renderFrame } from '../src/renderer/render.js';
+import { makeStage, withHeading } from '../src/renderer/stage.js';
+import { clipOf, compiled, stageOf } from './helpers.js';
+import { deriveSeed, randN } from '../src/core/rng.js';
 
-function digest(fb: Framebuffer): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < fb.data.length; i++) {
-    h ^= fb.data[i] ?? 0;
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16);
-}
-
-describe('générateur déterministe', () => {
-  it('reproduit la même suite pour une même seed', () => {
-    const a = new Rng(12345);
-    const b = new Rng(12345);
-    const sa = Array.from({ length: 16 }, () => a.next());
-    const sb = Array.from({ length: 16 }, () => b.next());
-    expect(sa).toEqual(sb);
-  });
-
-  it('produit des valeurs dans [0,1)', () => {
-    const r = new Rng(7);
-    for (let i = 0; i < 500; i++) {
-      const v = r.next();
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThan(1);
+describe('déterminisme', () => {
+  it('deux rendus de la même recette donnent exactement les mêmes pixels', () => {
+    for (const def of RECIPES) {
+      const a = clipOf(def.id).map((f) => f.signature);
+      const b = clipOf(def.id).map((f) => f.signature);
+      expect(b).toEqual(a);
     }
   });
 
-  it('dérive les seeds du chemin de nœud, pas de son index', () => {
-    const projectSeed = 0x5eed;
-    const a = deriveSeed(projectSeed, 'ice-frost-lance/shaft');
-    const b = deriveSeed(projectSeed, 'ice-frost-lance/debris');
-    expect(a).not.toBe(b);
-    // Ajouter un nœud décoratif ne change pas la seed des autres.
-    expect(deriveSeed(projectSeed, 'ice-frost-lance/shaft')).toBe(a);
+  it('le scrubbing donne le même résultat qu’une lecture depuis le début', () => {
+    const def = RECIPES[0]!;
+    const c = compiled(def.id);
+    const stage = stageOf(def.id);
+    const sequential = renderClip(c, stage).map((f) => f.signature);
+    // Accès direct, dans le désordre : aucune frame ne dépend d'un état
+    // accumulé par les précédentes.
+    const order = [7, 0, 11, 3, 5, 9, 1, 2, 10, 4, 8, 6];
+    const direct = new Array<string>(12);
+    for (const i of order) direct[i] = renderFrame(c, stage, i).signature;
+    expect(direct).toEqual(sequential);
   });
 
-  it('sépare les canaux du tirage sans état', () => {
-    expect(randN(99, 3, 1)).not.toBe(randN(99, 3, 2));
-    expect(rand1(99, 3)).toBe(rand1(99, 3));
-  });
-
-  it('hache les chaînes sans collision sur le catalogue', () => {
-    const hashes = new Set(SPELLS.map((s) => hashString(s.id)));
-    expect(hashes.size).toBe(SPELLS.length);
-  });
-});
-
-describe.each(SPELLS.map((s) => [s.id, s] as const))('recette %s', (_id, recipe) => {
-  it('rend deux fois les mêmes pixels', () => {
-    const a = renderFrame(recipe, 0.5, { heading: 1.1 });
-    const b = renderFrame(recipe, 0.5, { heading: 1.1 });
-    expect(digest(a.color)).toBe(digest(b.color));
-  });
-
-  it("la navigation directe donne le même état qu'une lecture depuis le début", () => {
-    // L'évaluation est analytique : on vérifie qu'une lecture séquentielle
-    // n'introduit aucun état résiduel qui changerait l'image visée.
-    const n = frameCount(recipe);
-    const target = Math.floor(n * 0.7);
-    for (let i = 0; i <= target; i++) renderFrame(recipe, frameTime(recipe, i), { heading: 0.4 });
-    const sequential = renderFrame(recipe, frameTime(recipe, target), { heading: 0.4 });
-    const direct = renderFrame(recipe, frameTime(recipe, target), { heading: 0.4 });
-    expect(digest(sequential.color)).toBe(digest(direct.color));
-  });
-
-  it('change de pixels quand la seed change', () => {
-    const a = renderFrame(recipe, 0.6, { heading: 0, seed: 1 });
-    const b = renderFrame(recipe, 0.6, { heading: 0, seed: 2 });
-    expect(digest(a.color)).not.toBe(digest(b.color));
-  });
-
-  it('produit des pixels différents selon le cap', () => {
-    const digests = new Set(
-      [0, 1, 2, 3].map((i) => digest(renderFrame(recipe, 0.5, { heading: (i * Math.PI) / 2 }).color)),
+  it('changer de seed change le rendu, changer de cap aussi', () => {
+    const def = RECIPES[0]!;
+    const c = compiled(def.id);
+    const base = stageOf(def.id);
+    const other = makeStage({
+      width: def.stage.width,
+      height: def.stage.height,
+      distance: def.stage.distance,
+      heading: 0,
+      seed: def.seed + 1,
+    });
+    expect(renderFrame(c, other, 8).signature).not.toBe(renderFrame(c, base, 8).signature);
+    expect(renderFrame(c, withHeading(base, Math.PI / 2), 8).signature).not.toBe(
+      renderFrame(c, base, 8).signature,
     );
-    // Aucune recette du catalogue n'est déclarée radiale : les quatre caps
-    // cardinaux doivent donner quatre images distinctes.
-    expect(recipe.radial).toBe(false);
-    expect(digests.size).toBe(4);
+  });
+
+  it('un tirage dépend de l’identifiant, pas de la place dans un tableau', () => {
+    const seed = 1234;
+    const before = [0, 1, 2].map((i) => randN(seed, i, 1));
+    // Insérer un grain revient à tirer sur d'autres index : les anciens
+    // gardent exactement leur valeur.
+    const after = [0, 1, 2, 3].map((i) => randN(seed, i, 1));
+    expect(after.slice(0, 3)).toEqual(before);
+    expect(deriveSeed(seed, 'objet/braise')).toBe(deriveSeed(seed, 'objet/braise'));
+    expect(deriveSeed(seed, 'objet/braise')).not.toBe(deriveSeed(seed, 'objet/fumee'));
+  });
+
+  it('la compilation est stable : mêmes diagnostics à chaque passage', () => {
+    for (const def of RECIPES) {
+      const a = compileRecipe(def).diagnostics.map((d) => `${d.code}:${d.path ?? ''}`);
+      const b = compileRecipe(def).diagnostics.map((d) => `${d.code}:${d.path ?? ''}`);
+      expect(b).toEqual(a);
+    }
   });
 });

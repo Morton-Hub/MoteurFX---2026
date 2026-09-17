@@ -77,3 +77,34 @@ export function normAngle(a: number): number {
   const r = a % TAU;
   return r < 0 ? r + TAU : r;
 }
+
+/** Plus proche entier, en s'éloignant de zéro sur .5 (stable en miroir). */
+export function snap(v: number): number {
+  return v < 0 ? -Math.round(-v) : Math.round(v);
+}
+
+/** Interpolation lisse sans dépassement, utile aux poses tenues. */
+export function smoothstep(a: number, b: number, v: number): number {
+  const t = ramp(v, a, b);
+  return t * t * (3 - 2 * t);
+}
+
+/** Point d'une Bézier quadratique. */
+export function bezier3(a: Vec3, b: Vec3, c: Vec3, t: number): Vec3 {
+  const u = 1 - t;
+  return {
+    x: u * u * a.x + 2 * u * t * b.x + t * t * c.x,
+    y: u * u * a.y + 2 * u * t * b.y + t * t * c.y,
+    z: u * u * a.z + 2 * u * t * b.z + t * t * c.z,
+  };
+}
+
+/** Tangente d'une Bézier quadratique (non normalisée). */
+export function bezier3Tangent(a: Vec3, b: Vec3, c: Vec3, t: number): Vec3 {
+  const u = 1 - t;
+  return {
+    x: 2 * (u * (b.x - a.x) + t * (c.x - b.x)),
+    y: 2 * (u * (b.y - a.y) + t * (c.y - b.y)),
+    z: 2 * (u * (b.z - a.z) + t * (c.z - b.z)),
+  };
+}

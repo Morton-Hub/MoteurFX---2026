@@ -1,78 +1,146 @@
 /**
- * Planche de controle du catalogue : une ligne par sort, cinq instants cles.
- * Chaque cellule est recadree sur les limites de capture calculees en prepasse
- * pour le cap 0, puis centree dans une cellule commune. C'est la planche a
- * regarder pour juger les identites, pas les instantanes isoles.
+ * Planches de contrôle.
  *
- *   npx tsx src/cli/board.ts [--out out/planche.png] [--scale 2] [--raw]
+ * Une planche n'est pas un livrable de jeu : c'est l'outil d'inspection
+ * visuelle exigé à chaque jalon (§17). Elle montre les douze cellules d'une
+ * recette, en couleur, en monochrome, en silhouette ou en émission seule.
+ *
+ *   npx tsx src/cli/board.ts --all --mode color --scale 2 --out docs/planches/catalogue.png
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { SPELLS } from '../spells/index.js';
-import { captureBounds, renderFrame } from '../render/renderer.js';
-import { DEFAULT_STYLE, RAW_STYLE } from '../style/styleProfile.js';
-import { encodePng, upscale } from '../export/png.js';
-import { blit, center, crop, filled, onBackground } from '../export/sheet.js';
-import type { RGBA } from '../raster/framebuffer.js';
+import { compileRecipe } from '../compiler/compile.js';
+import { getRecipe, listRecipes } from '../recipes/registry.js';
+import { Framebuffer, upscale } from '../pixels/rgba.js';
+import { encodePng } from '../exporter/png.js';
+import { renderClip } from '../renderer/render.js';
+import { makeStage } from '../renderer/stage.js';
+import { sampleDirections } from '../projection/directions.js';
+import type { RecipeDefinition } from '../recipes/types.js';
 
-const MOMENTS = [0.16, 0.34, 0.5, 0.66, 0.84];
-const DARK: RGBA = [24, 27, 35, 255];
-const GRID: RGBA = [52, 58, 72, 255];
-const PAD = 4;
+export type BoardMode = 'color' | 'mono' | 'silhouette' | 'emission';
 
-const argv = process.argv.slice(2);
-const arg = (name: string, fallback: string): string => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 && argv[i + 1] ? argv[i + 1]! : fallback;
+export type BoardOptions = {
+  readonly recipes: readonly RecipeDefinition[];
+  readonly mode: BoardMode;
+  readonly heading: number;
+  readonly scale: number;
+  readonly background: readonly [number, number, number, number];
+  /** Une ligne par cap au lieu d'une ligne par recette. */
+  readonly directions?: number;
+  /** Cellules par ligne. 12 = une recette par ligne ; 4 = grille 4x3. */
+  readonly columns?: number;
 };
-const raw = argv.includes('--raw');
-const silhouette = argv.includes('--silhouette');
-const scale = Number(arg('scale', '2'));
-const outPath = arg('out', raw ? 'out/planche-brute.png' : 'out/planche.png');
 
-const style = raw ? RAW_STYLE : DEFAULT_STYLE;
+const BACKGROUNDS: Record<string, [number, number, number, number]> = {
+  dark: [24, 22, 32, 255],
+  light: [214, 212, 208, 255],
+  busy: [58, 72, 58, 255],
+};
 
-const rows = SPELLS.map((recipe) => {
-  const rect = captureBounds(recipe, [0], {}, 2);
-  const clipped = {
-    x0: Math.max(0, rect.x0),
-    y0: Math.max(0, rect.y0),
-    x1: Math.min(recipe.canvas.width - 1, rect.x1),
-    y1: Math.min(recipe.canvas.height - 1, rect.y1),
-  };
-  return MOMENTS.map((t) =>
-    crop(renderFrame(recipe, t, { heading: 0, style, silhouetteOnly: silhouette }).color, clipped),
-  );
-});
-
-const cellW = Math.max(...rows.flat().map((f) => f.width));
-const cellH = Math.max(...rows.flat().map((f) => f.height));
-const sheet = filled(
-  MOMENTS.length * (cellW + PAD) + PAD,
-  rows.length * (cellH + PAD) + PAD,
-  [14, 16, 22, 255],
-);
-
-rows.forEach((row, r) => {
-  row.forEach((fb, c) => {
-    const x = PAD + c * (cellW + PAD);
-    const y = PAD + r * (cellH + PAD);
-    for (let i = -1; i <= cellW; i++) {
-      sheet.plot(x + i, y - 1, GRID);
-      sheet.plot(x + i, y + cellH, GRID);
+function frameImage(frame: ReturnType<typeof renderClip>[number], mode: BoardMode): Framebuffer {
+  switch (mode) {
+    case 'mono':
+      return frame.body.toMono();
+    case 'silhouette':
+      return frame.body.toSilhouette([240, 238, 246, 255]);
+    case 'emission':
+      return frame.emission.toRgba();
+    default: {
+      const fb = frame.body.toRgba();
+      // La passe lumineuse est ajoutée par-dessus, comme dans le jeu.
+      fb.composite(frame.emission.toRgba(), 'add');
+      return fb;
     }
-    for (let i = -1; i <= cellH; i++) {
-      sheet.plot(x - 1, y + i, GRID);
-      sheet.plot(x + cellW, y + i, GRID);
+  }
+}
+
+export function buildBoard(o: BoardOptions): Framebuffer {
+  const rows: { label: string; images: Framebuffer[]; w: number; h: number }[] = [];
+  for (const def of o.recipes) {
+    const compiled = compileRecipe(def, { probeParams: false });
+    const headings =
+      o.directions && o.directions > 1
+        ? sampleDirections(o.directions, o.heading).map((d) => d.heading)
+        : [o.heading];
+    for (const heading of headings) {
+      const stage = makeStage({
+        width: def.stage.width,
+        height: def.stage.height,
+        distance: def.stage.distance,
+        ...(def.stage.casterHeight !== undefined ? { casterHeight: def.stage.casterHeight } : {}),
+        ...(def.stage.targetAt ? { targetAt: def.stage.targetAt } : {}),
+        heading,
+        seed: def.seed,
+      });
+      const frames = renderClip(compiled, stage);
+      rows.push({
+        label: def.id,
+        images: frames.map((f) => frameImage(f, o.mode)),
+        w: def.stage.width,
+        h: def.stage.height,
+      });
     }
-    blit(sheet, center(onBackground(fb, DARK), cellW, cellH, DARK), x, y);
+  }
+  const cellW = Math.max(...rows.map((r) => r.w));
+  const cellH = Math.max(...rows.map((r) => r.h));
+  const columns = Math.max(1, Math.min(12, o.columns ?? 12));
+  const linesPerRow = Math.ceil(12 / columns);
+  const sheet = new Framebuffer(cellW * columns, cellH * rows.length * linesPerRow);
+  sheet.fill(o.background as [number, number, number, number]);
+  rows.forEach((row, ri) => {
+    row.images.forEach((img, fi) => {
+      const col = fi % columns;
+      const line = ri * linesPerRow + Math.floor(fi / columns);
+      sheet.blit(
+        img,
+        col * cellW + Math.floor((cellW - img.width) / 2),
+        line * cellH + Math.floor((cellH - img.height) / 2),
+      );
+    });
   });
-});
+  return o.scale > 1 ? upscale(sheet, o.scale) : sheet;
+}
 
-mkdirSync(dirname(outPath), { recursive: true });
-writeFileSync(outPath, encodePng(upscale(sheet, scale)));
-process.stdout.write(
-  `planche ecrite: ${outPath} (${sheet.width * scale}x${sheet.height * scale}, ` +
-    `${SPELLS.length} sorts x ${MOMENTS.length} instants)\n`,
-);
+function parseArgs(argv: readonly string[]): Record<string, string | boolean> {
+  const out: Record<string, string | boolean> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] as string;
+    if (!a.startsWith('--')) continue;
+    const key = a.slice(2);
+    const next = argv[i + 1];
+    if (next && !next.startsWith('--')) {
+      out[key] = next;
+      i++;
+    } else {
+      out[key] = true;
+    }
+  }
+  return out;
+}
+
+function main(): void {
+  const args = parseArgs(process.argv.slice(2));
+  const recipes = args['all']
+    ? listRecipes()
+    : String(args['recipe'] ?? 'fire-ember-petal-s')
+        .split(',')
+        .map((id) => getRecipe(id.trim()));
+  const out = String(args['out'] ?? 'docs/planches/planche.png');
+  const board = buildBoard({
+    recipes,
+    mode: (args['mode'] as BoardMode) ?? 'color',
+    heading: Number(args['heading'] ?? 0),
+    scale: Number(args['scale'] ?? 1),
+    background: BACKGROUNDS[String(args['bg'] ?? 'dark')] ?? BACKGROUNDS['dark']!,
+    ...(args['directions'] ? { directions: Number(args['directions']) } : {}),
+    ...(args['columns'] ? { columns: Number(args['columns']) } : {}),
+  });
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, encodePng(board));
+  console.log(`${out} — ${board.width}x${board.height}, ${recipes.length} recette(s)`);
+}
+
+const invoked = process.argv[1] ?? '';
+if (invoked.includes('board')) main();
