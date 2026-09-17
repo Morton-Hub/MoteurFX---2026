@@ -1,0 +1,788 @@
+[
+  {
+    "id": "fire-ember-petal-s",
+    "name": "Pétale de braise",
+    "family": "fire-ember",
+    "element": "fire",
+    "rank": "S",
+    "action": "projectile",
+    "silhouette": "Une petite masse crochue, lancée à hauteur de main, qui s’ouvre en trois pétales au contact et laisse des braises.",
+    "durations": [
+      65,
+      65,
+      70,
+      75,
+      60,
+      45,
+      35,
+      45,
+      70,
+      85,
+      100,
+      120
+    ],
+    "totalMs": 835,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "source"
+      },
+      {
+        "role": "fly",
+        "range": [
+          3,
+          5
+        ],
+        "anchor": "projectile"
+      },
+      {
+        "role": "hit",
+        "range": [
+          6,
+          8
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          9,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "release",
+        "frame": 2
+      },
+      {
+        "id": "contact",
+        "frame": 6
+      },
+      {
+        "id": "peak",
+        "frame": 7
+      },
+      {
+        "id": "settle",
+        "frame": 9
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      160,
+      120
+    ],
+    "silhouettePx": [
+      75,
+      61
+    ],
+    "colors": 10,
+    "msPerFrame": 4.1
+  },
+  {
+    "id": "fire-dragon-pillar-m",
+    "name": "Pilier du dragon",
+    "family": "fire-ember",
+    "element": "fire",
+    "rank": "M",
+    "action": "eruption",
+    "silhouette": "Une colonne verticale qui jaillit du sol, tient sa pose ouverte, puis se déchire en deux quand le débit est coupé.",
+    "durations": [
+      70,
+      60,
+      50,
+      45,
+      45,
+      50,
+      70,
+      80,
+      60,
+      60,
+      90,
+      120
+    ],
+    "totalMs": 800,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "ground-target"
+      },
+      {
+        "role": "hit",
+        "range": [
+          3,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "peak",
+        "frame": 6
+      },
+      {
+        "id": "fracture",
+        "frame": 8
+      },
+      {
+        "id": "settle",
+        "frame": 10
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      144,
+      176
+    ],
+    "silhouettePx": [
+      114,
+      92
+    ],
+    "colors": 9,
+    "msPerFrame": 1.8
+  },
+  {
+    "id": "fire-comet-heart-l",
+    "name": "Cœur de comète",
+    "family": "fire-ember",
+    "element": "fire",
+    "rank": "L",
+    "action": "skystrike",
+    "silhouette": "Une masse rocheuse à croûte sombre et veines chaudes, annoncée par son ombre, qui tombe du ciel et se disloque en fragments lourds.",
+    "durations": [
+      70,
+      70,
+      80,
+      90,
+      60,
+      40,
+      35,
+      35,
+      55,
+      75,
+      95,
+      115
+    ],
+    "totalMs": 820,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "sky"
+      },
+      {
+        "role": "fly",
+        "range": [
+          3,
+          5
+        ],
+        "anchor": "projectile"
+      },
+      {
+        "role": "hit",
+        "range": [
+          6,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "release",
+        "frame": 2
+      },
+      {
+        "id": "contact",
+        "frame": 6
+      },
+      {
+        "id": "fracture",
+        "frame": 7
+      },
+      {
+        "id": "peak",
+        "frame": 8
+      },
+      {
+        "id": "settle",
+        "frame": 10
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      176,
+      200
+    ],
+    "silhouettePx": [
+      113,
+      131
+    ],
+    "colors": 12,
+    "msPerFrame": 2.3
+  },
+  {
+    "id": "ice-aurora-needle-s",
+    "name": "Aiguille d’aurore",
+    "family": "ice-aurora",
+    "element": "ice",
+    "rank": "S",
+    "action": "projectile",
+    "silhouette": "Un prisme rigide construit par paliers, projeté dans l’axe du cap, qui casse net en facettes plates.",
+    "durations": [
+      70,
+      60,
+      70,
+      80,
+      55,
+      40,
+      35,
+      50,
+      70,
+      80,
+      95,
+      110
+    ],
+    "totalMs": 815,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "source"
+      },
+      {
+        "role": "fly",
+        "range": [
+          3,
+          5
+        ],
+        "anchor": "projectile"
+      },
+      {
+        "role": "hit",
+        "range": [
+          6,
+          8
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          9,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "release",
+        "frame": 2
+      },
+      {
+        "id": "contact",
+        "frame": 6
+      },
+      {
+        "id": "fracture",
+        "frame": 7
+      },
+      {
+        "id": "settle",
+        "frame": 9
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      160,
+      120
+    ],
+    "silhouettePx": [
+      49,
+      28
+    ],
+    "colors": 6,
+    "msPerFrame": 0.7
+  },
+  {
+    "id": "ice-frost-garden-m",
+    "name": "Jardin de givre",
+    "family": "ice-aurora",
+    "element": "ice",
+    "rank": "M",
+    "action": "summon",
+    "silhouette": "Une couronne de prismes obliques qui pousse par paliers autour de la cible, tient, puis se rompt vers l’extérieur.",
+    "durations": [
+      80,
+      70,
+      60,
+      55,
+      50,
+      50,
+      90,
+      90,
+      45,
+      45,
+      90,
+      120
+    ],
+    "totalMs": 845,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "ground-target"
+      },
+      {
+        "role": "hit",
+        "range": [
+          3,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "peak",
+        "frame": 6
+      },
+      {
+        "id": "fracture",
+        "frame": 8
+      },
+      {
+        "id": "settle",
+        "frame": 10
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      144,
+      120
+    ],
+    "silhouettePx": [
+      73,
+      61
+    ],
+    "colors": 6,
+    "msPerFrame": 1.3
+  },
+  {
+    "id": "ice-boreal-cathedral-l",
+    "name": "Cathédrale boréale",
+    "family": "ice-aurora",
+    "element": "ice",
+    "rank": "L",
+    "action": "wave",
+    "silhouette": "Un front de gel qui avance au sol, lève deux rangées de nervures et referme une arche au-dessus de la cible avant de la briser.",
+    "durations": [
+      85,
+      75,
+      70,
+      65,
+      60,
+      60,
+      95,
+      95,
+      50,
+      55,
+      95,
+      125
+    ],
+    "totalMs": 930,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "ground-source"
+      },
+      {
+        "role": "hit",
+        "range": [
+          3,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "peak",
+        "frame": 6
+      },
+      {
+        "id": "fracture",
+        "frame": 8
+      },
+      {
+        "id": "settle",
+        "frame": 10
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      176,
+      144
+    ],
+    "silhouettePx": [
+      95,
+      84
+    ],
+    "colors": 6,
+    "msPerFrame": 1.9
+  },
+  {
+    "id": "lightning-storm-thread-s",
+    "name": "Fil d’orage",
+    "family": "lightning-storm",
+    "element": "lightning",
+    "rank": "S",
+    "action": "connection",
+    "silhouette": "Une couture lumineuse brisée entre deux attaches : connexion brusque, pose tenue, coupure, reprise.",
+    "durations": [
+      60,
+      45,
+      35,
+      30,
+      45,
+      30,
+      35,
+      45,
+      60,
+      70,
+      90,
+      110
+    ],
+    "totalMs": 655,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "source"
+      },
+      {
+        "role": "hit",
+        "range": [
+          3,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "contact",
+        "frame": 3
+      },
+      {
+        "id": "peak",
+        "frame": 4
+      },
+      {
+        "id": "fracture",
+        "frame": 5
+      },
+      {
+        "id": "settle",
+        "frame": 9
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      168,
+      120
+    ],
+    "silhouettePx": [
+      58,
+      36
+    ],
+    "colors": 6,
+    "msPerFrame": 0.8
+  },
+  {
+    "id": "lightning-ionic-ricochet-m",
+    "name": "Ricochet ionique",
+    "family": "lightning-storm",
+    "element": "lightning",
+    "rank": "M",
+    "action": "connection",
+    "silhouette": "Un arc qui saute entre trois cibles : chaque saut a son nœud, sa pose tenue et sa coupure.",
+    "durations": [
+      55,
+      45,
+      35,
+      40,
+      35,
+      45,
+      35,
+      45,
+      55,
+      70,
+      90,
+      110
+    ],
+    "totalMs": 660,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          1
+        ],
+        "anchor": "source"
+      },
+      {
+        "role": "hit",
+        "range": [
+          2,
+          9
+        ],
+        "anchor": "target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "contact",
+        "frame": 2
+      },
+      {
+        "id": "peak",
+        "frame": 6
+      },
+      {
+        "id": "settle",
+        "frame": 9
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      208,
+      136
+    ],
+    "silhouettePx": [
+      69,
+      56
+    ],
+    "colors": 6,
+    "msPerFrame": 1
+  },
+  {
+    "id": "lightning-thunder-crown-l",
+    "name": "Couronne du tonnerre",
+    "family": "lightning-storm",
+    "element": "lightning",
+    "rank": "L",
+    "action": "skystrike",
+    "silhouette": "Une colonne céleste qui frappe la cible puis distribue des branches interrompues sur le sol.",
+    "durations": [
+      80,
+      70,
+      50,
+      30,
+      35,
+      45,
+      35,
+      50,
+      65,
+      80,
+      95,
+      120
+    ],
+    "totalMs": 755,
+    "clips": [
+      {
+        "role": "cast",
+        "range": [
+          0,
+          2
+        ],
+        "anchor": "sky"
+      },
+      {
+        "role": "hit",
+        "range": [
+          3,
+          9
+        ],
+        "anchor": "ground-target"
+      },
+      {
+        "role": "residue",
+        "range": [
+          10,
+          11
+        ],
+        "anchor": "ground-target"
+      }
+    ],
+    "events": [
+      {
+        "id": "cast",
+        "frame": 0
+      },
+      {
+        "id": "contact",
+        "frame": 3
+      },
+      {
+        "id": "peak",
+        "frame": 4
+      },
+      {
+        "id": "fracture",
+        "frame": 6
+      },
+      {
+        "id": "settle",
+        "frame": 9
+      },
+      {
+        "id": "clear",
+        "frame": 11
+      }
+    ],
+    "canvas": [
+      176,
+      192
+    ],
+    "silhouettePx": [
+      92,
+      101
+    ],
+    "colors": 6,
+    "msPerFrame": 0.9
+  }
+]

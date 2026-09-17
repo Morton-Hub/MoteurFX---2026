@@ -10,14 +10,18 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { deflateSync } from 'node:zlib';
 import { compileRecipe } from '../compiler/compile.js';
 import { getRecipe, listRecipes } from '../recipes/registry.js';
 import { Framebuffer, upscale } from '../pixels/rgba.js';
-import { encodePng } from '../exporter/png.js';
+import { encodePng, setDeflate } from '../exporter/png.js';
+import { encodeGif } from '../exporter/gif.js';
 import { renderClip } from '../renderer/render.js';
 import { makeStage } from '../renderer/stage.js';
 import { sampleDirections } from '../projection/directions.js';
 import type { RecipeDefinition } from '../recipes/types.js';
+
+setDeflate((data) => new Uint8Array(deflateSync(data, { level: 9 })));
 
 export type BoardMode = 'color' | 'mono' | 'silhouette' | 'emission';
 
@@ -103,6 +107,82 @@ export function buildBoard(o: BoardOptions): Framebuffer {
   return o.scale > 1 ? upscale(sheet, o.scale) : sheet;
 }
 
+/**
+ * Animation de contrôle : les douze images, à leurs vraies expositions, dans
+ * un agrandissement entier. Ce n'est pas un asset livrable — c'est l'outil qui
+ * permet de juger le rythme à vitesse normale.
+ */
+export function buildAnimation(
+  def: RecipeDefinition,
+  o: {
+    mode: BoardMode;
+    heading: number;
+    scale: number;
+    background: readonly [number, number, number, number];
+    /** Recadre sur l'union des silhouettes des douze images, avec marge. */
+    crop?: number;
+  },
+): Uint8Array {
+  const compiled = compileRecipe(def, { probeParams: false });
+  const stage = makeStage({
+    width: def.stage.width,
+    height: def.stage.height,
+    distance: def.stage.distance,
+    ...(def.stage.casterHeight !== undefined ? { casterHeight: def.stage.casterHeight } : {}),
+    ...(def.stage.targetAt ? { targetAt: def.stage.targetAt } : {}),
+    heading: o.heading,
+    seed: def.seed,
+  });
+  const rendered = renderClip(compiled, stage);
+  // Le recadrage se fait sur **l'union** des douze silhouettes : recadrer
+  // image par image donnerait un sprite qui saute d'une frame à l'autre.
+  let crop: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  if (o.crop !== undefined) {
+    for (const f of rendered) {
+      if (!f.bounds) continue;
+      crop = crop
+        ? {
+            x0: Math.min(crop.x0, f.bounds.x0),
+            y0: Math.min(crop.y0, f.bounds.y0),
+            x1: Math.max(crop.x1, f.bounds.x1),
+            y1: Math.max(crop.y1, f.bounds.y1),
+          }
+        : { ...f.bounds };
+    }
+    if (crop) {
+      const m = o.crop;
+      crop = {
+        x0: Math.max(0, crop.x0 - m),
+        y0: Math.max(0, crop.y0 - m),
+        x1: Math.min(def.stage.width - 1, crop.x1 + m),
+        y1: Math.min(def.stage.height - 1, crop.y1 + m),
+      };
+    }
+  }
+  const frames = rendered.map((f) => {
+    const full = frameImage(f, o.mode);
+    const image = crop ? cropFramebuffer(full, crop) : full;
+    return o.scale > 1 ? upscale(image, o.scale) : image;
+  });
+  return encodeGif(frames, {
+    delayCs: compiled.budget.frameDurationsMs.map((d) => Math.max(2, Math.round(d / 10))),
+    background: [o.background[0], o.background[1], o.background[2]],
+  });
+}
+
+function cropFramebuffer(
+  fb: Framebuffer,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+): Framebuffer {
+  const out = new Framebuffer(rect.x1 - rect.x0 + 1, rect.y1 - rect.y0 + 1);
+  for (let y = 0; y < out.height; y++) {
+    for (let x = 0; x < out.width; x++) {
+      out.plot(x, y, fb.get(rect.x0 + x, rect.y0 + y));
+    }
+  }
+  return out;
+}
+
 function parseArgs(argv: readonly string[]): Record<string, string | boolean> {
   const out: Record<string, string | boolean> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -128,12 +208,31 @@ function main(): void {
         .split(',')
         .map((id) => getRecipe(id.trim()));
   const out = String(args['out'] ?? 'docs/planches/planche.png');
+  const background = BACKGROUNDS[String(args['bg'] ?? 'dark')] ?? BACKGROUNDS['dark']!;
+
+  if (args['gif']) {
+    for (const def of recipes) {
+      const gif = buildAnimation(def, {
+        mode: (args['mode'] as BoardMode) ?? 'color',
+        heading: Number(args['heading'] ?? 0),
+        scale: Number(args['scale'] ?? 3),
+        background,
+        ...(args['crop'] !== undefined ? { crop: Number(args['crop']) || 4 } : {}),
+      });
+      const path = recipes.length === 1 ? out : out.replace(/\.gif$/, `-${def.id}.gif`);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, gif);
+      console.log(`${path} — ${gif.length} octets`);
+    }
+    return;
+  }
+
   const board = buildBoard({
     recipes,
     mode: (args['mode'] as BoardMode) ?? 'color',
     heading: Number(args['heading'] ?? 0),
     scale: Number(args['scale'] ?? 1),
-    background: BACKGROUNDS[String(args['bg'] ?? 'dark')] ?? BACKGROUNDS['dark']!,
+    background,
     ...(args['directions'] ? { directions: Number(args['directions']) } : {}),
     ...(args['columns'] ? { columns: Number(args['columns']) } : {}),
   });
