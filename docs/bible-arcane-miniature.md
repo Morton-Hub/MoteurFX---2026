@@ -99,6 +99,50 @@ Trois décisions concrètes en découlent dans le code :
 | Contours qui vibrent | Placement entier, pas de rotation de dessin, seed stable par objet |
 | Quantité de recettes prise pour de la diversité | Neuf recettes, chacune avec son opérateur ; une famille dont deux rangs partageraient un opérateur échoue au test |
 
+## Particules et secondaires
+
+Un sort n'est pas seulement sa masse principale. Ce qui le rend **impressionnant**,
+c'est ce qui l'accompagne — et ce qui distingue les éléments, une fois la masse
+retirée, ce sont précisément ces secondaires-là.
+
+### La structure en trois temps
+
+| Temps | Ce qu'on montre | Où c'est appliqué |
+|---|---|---|
+| **Anticipation** | Peu de matière, elle **converge**, le sol chauffe ou se charge | frames 1–3 des neuf recettes |
+| **Climax** | Densité et contraste maximaux, une seule image, onde au sol | frame de contact, marquée `contact` dans le manifeste |
+| **Dissipation** | Ce qui reste retombe, le gazeux prend le relais, le décalque se retire | trois à quatre dernières images |
+
+Plus l'anticipation est lisible, plus le climax porte. C'est pour cela que les
+premières images ne montrent presque rien d'autre qu'une convergence.
+
+### Vocabulaires élémentaires
+
+| Élément | Secondaires | Onde au sol | Ce qu'on refuse |
+|---|---|---|---|
+| Feu | Braises qui montent et refroidissent, étincelles à traînée, cendres qui tournoient, fumée qui s'ouvre | Pétales rayonnants, creux au centre | Un halo orange uniforme |
+| Glace | Éclats rigides **sans traînée**, poudrin flottant, brume rasante, éclats de lumière tenus une image | Pointes nettes qui poussent par paliers | Une poussière bleue générique |
+| Foudre | Étincelles filantes, poussière statique **aspirée** vers la charge, nœuds tenus | Branches qui courent et s'interrompent | Un anneau lumineux, sous aucun prétexte |
+
+### Règles de fabrication
+
+- **Une particule est un amas**, jamais un point : cinq pixels au minimum. Un
+  pixel isolé grésille en mouvement et disparaît à la lecture.
+- **Le gazeux a un cœur plein et un bord tramé**, et son bord ne se pose que
+  sur du vide : une bouffée entièrement tramée perfore ce qu'elle recouvre.
+- **Tout est semé dans le monde et orienté par le cap.** À l'impact, la gerbe
+  part vers l'avant du sort : c'est ce qui rend les huit directions réellement
+  différentes.
+- **Les décalques au sol forment un plan peint avant la scène.** Un simple
+  décalage de profondeur ne suffit pas : un objet placé derrière la cible
+  passait sous le décalque et se faisait découper par son tramage.
+- **Rien ne se renouvelle au hasard d'une image à l'autre.** Positions et
+  tailles sont des fonctions fermées de `(seed, identifiant, index)`.
+
+Deux tests mesurent ces règles sur les neuf recettes : nombre de pixels isolés
+et nombre de formes par image, en voisinage 8 — une diagonale d'un pixel est
+une forme, pas de la poussière.
+
 ## Trois rangs, trois constructions
 
 Pour passer d'un rang à l'autre, au moins la silhouette, le comportement

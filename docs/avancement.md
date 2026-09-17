@@ -38,9 +38,23 @@ construction, trouvées en inspectant les rendus :
 | Le météore était couvert de confettis | Les veines chaudes étaient semées par bruit | Les veines sont des **traits** tracés depuis le centre et coupés par la silhouette |
 | Le pilier était identique dans les huit caps | Failles, lobes et semis ne dépendaient pas du cap | Marques au sol, lobes latéraux et semis orientés par le cap ; le test de variation de silhouette par cap le vérifie |
 
+## Refonte FX
+
+Les neuf sorts ont été remis en scène sur la structure anticipation → climax →
+dissipation, avec un système de particules déterministe et un vocabulaire
+propre à chaque élément. Quatre corrections sont venues de mesures, pas de
+préférences :
+
+| Symptôme | Cause mesurée | Correction |
+|---|---|---|
+| Pétales d'onde qui se lisaient comme des feuilles découpées | Peints à plat, sans structure de valeur | Ombrage par épaisseur : pointe saturée, racine claire |
+| Matière réduite en damier sous la fumée et le givre | Une matière tramée posée **par-dessus** laisse un pixel sur deux du dessous | Le bord tramé ne se pose que sur du vide ; le cœur reste plein |
+| Objets découpés par les décalques au sol | Le tri par profondeur ne peut pas exprimer « toujours sous ce qui se tient dessus » | Deux plans de peinture : sol, puis scène — 65 pixels isolés ramenés à 29 |
+| Sprites qui débordaient du canevas | Les gerbes portent plus loin que les masses | Scènes de capture agrandies, portée des gerbes plafonnée, zéro débordement sur 16 caps |
+
 ## Contrôles automatiques en place
 
-68 tests, dont ceux qui gardent les promesses du document :
+75 tests, dont ceux qui gardent les promesses du document :
 
 - douze images, douze expositions positives, plages sans trou ni chevauchement ;
 - aucune recette ne déborde de son canevas, sur quatre caps ;
@@ -52,6 +66,10 @@ construction, trouvées en inspectant les rendus :
 - déterminisme complet et scrubbing équivalent à une lecture séquentielle ;
 - parité pixel entre preview et export ;
 - une retouche obsolète est signalée et non appliquée ;
+- les particules sont analytiques : sauter à une image donne le même état qu'y
+  arriver, et ajouter une particule ne déplace pas les autres ;
+- aucune image ne se dissout en poussière d'un pixel, ni ne dépasse le nombre
+  de formes lisible ;
 - un projet portable refuse une clé inconnue et une version future.
 
 ## Prochaine action précise

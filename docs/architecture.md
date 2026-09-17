@@ -84,6 +84,21 @@ base change, elle est **signalée obsolète et non appliquée** : appliquer une
 retouche au mauvais endroit est pire que ne pas l'appliquer. La revalidation
 est un geste explicite.
 
+### Particules analytiques, jamais accumulées
+
+Une particule n'a pas d'état : sa position est une fonction fermée de son âge,
+freinage compris. C'est ce qui permet au scrubbing de rester exact et à une
+image de se régénérer seule. La seed vient de `(seed projet, identifiant
+d'émetteur, index)` : ajouter une braise ne déplace pas les autres.
+
+### Deux plans de peinture
+
+Les décalques au sol — ombres, brûlures, givre, ondes — sont peints **tous
+avant** la scène. Un décalage de profondeur ne suffisait pas : la clé de tri
+dépend de la position monde, donc un objet placé derrière la cible passait sous
+le décalque de la cible et se faisait découper par son tramage. Mesure avant /
+après sur l'image la plus chargée du catalogue : 65 pixels isolés, puis 29.
+
 ### Un opérateur par rang
 
 `familyId` lie trois recettes ; un bouton de rang sélectionne une recette

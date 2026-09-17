@@ -21,6 +21,10 @@ jamais plus de douze images par direction.
 - Corps en **pixels indexés** (palette par rôles), passe lumineuse séparée et
   optionnelle, ombre portée tramée.
 - Trente-sept **motifs dessinés** originaux, écrits en ASCII par rôles.
+- Un système de **particules déterministes** orientées par le cap : braises,
+  étincelles, cendres, fumée, éclats, poudrin, brume, arcs — avec un
+  vocabulaire propre à chaque élément et des ondes construites dans le plan du
+  sol, donc justes dans les huit directions.
 - Retouches **non destructives**, signées sur la base : si la génération
   change, la correction est signalée obsolète au lieu d'être appliquée ailleurs.
 - Atelier web : bibliothèque S/M/L, scène isométrique avec personnage témoin,
@@ -34,7 +38,7 @@ jamais plus de douze images par direction.
 
 ```bash
 npm install
-npm test                 # 68 tests
+npm test                 # 75 tests
 npm run dev              # l'atelier, sur un serveur local
 npm run render -- --all --dirs 8 --out out
 ```
