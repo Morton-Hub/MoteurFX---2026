@@ -1,9 +1,9 @@
 {
-  "name": "moteurfx-2026",
-  "version": "2.0.0-j3",
+  "name": "motorfx2",
+  "version": "2026.2.0",
   "private": true,
   "type": "module",
-  "description": "FX16bit V2 - editeur de sorts procedraux pixel art isometriques",
+  "description": "MOTORFX2 — atelier de creation de FX pixel art pour jeux isometriques",
   "engines": {
     "node": ">=20.11"
   },
@@ -11,10 +11,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "render": "tsx src/cli/render.ts",
-    "render:all": "tsx src/cli/render.ts --all --gif --sheet",
+    "board": "tsx src/cli/board.ts",
+    "motifs": "tsx src/cli/motifs.ts",
+    "inspect": "tsx src/cli/inspect.ts",
+    "summary": "tsx src/cli/summary.ts",
     "dev": "vite --config web/vite.config.ts",
     "build:web": "vite build --config web/vite.config.ts && node scripts/bundle-single.mjs",
-    "bounds": "tsx src/cli/bounds.ts"
+    "planches": "tsx src/cli/board.ts --all --scale 1 --out docs/planches/catalogue.png && tsx src/cli/board.ts --all --scale 1 --mode mono --out docs/planches/catalogue-monochrome.png && tsx src/cli/board.ts --all --scale 1 --mode silhouette --out docs/planches/catalogue-silhouettes.png && tsx src/cli/board.ts --all --gif --crop 5 --scale 3 --out docs/planches/anim.gif"
   },
   "devDependencies": {
     "@types/node": "22.7.5",

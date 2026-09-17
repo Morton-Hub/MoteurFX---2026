@@ -1,103 +1,78 @@
-# MoteurFX 2026 — V2
+# MOTORFX2 — Atelier de magie en pixel art
 
-Moteur de création de FX pixel art pour jeux isométriques : un éditeur de sorts
-procéduraux déterministe, à cap libre sur 360°, avec export utilisable dans un
-moteur de jeu.
+Atelier de création de FX pour jeu isométrique : composer, animer, orienter et
+exporter des sorts en pixel art, sous un contrat ferme — **douze images par
+sort et par direction, trois rangs S / M / L par élément**.
 
-Ce dépôt contient l'incrément **J0 → J3 partiel** de la feuille de route : le
-noyau déterministe, la projection isométrique, le rastériseur logiciel, un
-catalogue de **six sorts — un par élément de base**, un atelier de lecture web,
-et un export PNG / GIF / manifeste par ligne de commande.
+![Le catalogue livré](docs/planches/catalogue.png)
 
 ## Ce qui tourne aujourd'hui
 
-| Sort | Élément | Idée directrice |
-|---|---|---|
-| **Lance de Givre** | Glace | Un prisme hexagonal se construit, tient rigide, part d'un bloc, se rompt en fragments facettés |
-| **Arc de Rupture** | Électricité | Cinq décharges de géométrie figée, séparées par du noir, reliées par un fantôme d'ionisation |
-| **Boule de Feu** | Feu | Les flammes se rassemblent dans la main, la masse part en laissant une traînée, puis éclate en s'ouvrant large avant de se déchirer en langues |
-| **Lame Déferlante** | Eau | Une lame pleine dont la lèvre dépasse la base, forme un tube, puis se disloque en gouttes |
-| **Marteau de Pierre** | Terre | Une masse s'arrache du sol, monte, marque une suspension lourde, puis s'abat en arc sur la cible et éclate |
-| **Spirale de Coupe** | Vent | Des arcs ouverts tournent autour d'un axe vertical, accélèrent, puis fuient par la tangente |
+| Famille | S | M | L |
+|---|---|---|---|
+| **Braise** (feu) | Pétale de braise — masse lancée, ouverture en pétales | Pilier du dragon — colonne qui jaillit du sol et se déchire | Cœur de comète — masse rocheuse venue du ciel, impact lourd |
+| **Aurore** (glace) | Aiguille d'aurore — prisme rigide, rupture nette | Jardin de givre — couronne de prismes qui pousse par paliers | Cathédrale boréale — front de gel et nervures levées |
+| **Orage** (foudre) | Fil d'orage — une couture entre deux attaches, avec reprise | Ricochet ionique — trois sauts, trois nœuds, trois coupures | Couronne du tonnerre — frappe verticale et branches au sol |
 
-Chaque sort accepte un **cap horizontal arbitraire** et s'exporte en 8, 16 ou N
-directions échantillonnées dans le repère monde.
+Neuf recettes, chacune avec son propre opérateur. Chaque sort s'exporte en 8 ou
+16 caps échantillonnés dans le repère monde — soit 96 ou 192 cellules d'atlas,
+jamais plus de douze images par direction.
 
-## Commandes
+- Corps en **pixels indexés** (palette par rôles), passe lumineuse séparée et
+  optionnelle, ombre portée tramée.
+- Trente-sept **motifs dessinés** originaux, écrits en ASCII par rôles.
+- Retouches **non destructives**, signées sur la base : si la génération
+  change, la correction est signalée obsolète au lieu d'être appliquée ailleurs.
+- Atelier web : bibliothèque S/M/L, scène isométrique avec personnage témoin,
+  comparaison des caps, timeline des douze cellules avec expositions et
+  événements, pelure d'oignon, crayon / gomme / pipette, annuler-rétablir,
+  sauvegarde de session et projet portable.
+- Export : atlas corps + émission, manifeste versionné, images séparées,
+  animation de contrôle, pack ZIP depuis le navigateur.
+
+## Démarrer
 
 ```bash
 npm install
-
-npm run typecheck          # TypeScript strict, aucun any implicite
-npm test                   # 138 tests d'invariants (Vitest)
-
-npm run dev                # atelier web sur serveur Vite local
-npm run build:web          # dist/atelier.html — page unique autonome
-
-npm run render:all         # PNG + GIF + planches + manifestes dans out/
-npm run bounds             # diagnostic de cadrage par recette
-npx tsx src/cli/board.ts   # planche de contrôle du catalogue
+npm test                 # 68 tests
+npm run dev              # l'atelier, sur un serveur local
+npm run render -- --all --dirs 8 --out out
 ```
 
-Exemples d'export ciblé :
+`npm run dev` sert l'atelier ; l'ouvrir par double-clic ne fonctionne pas, les
+modules et le Worker exigent un serveur HTTP. Sans Worker disponible, l'atelier
+bascule sur un rendu synchrone et le dit dans sa barre d'état.
 
-```bash
-# 16 directions, toutes les images en PNG
-npx tsx src/cli/render.ts --spell ice-frost-lance --dirs 16 --frames
-
-# quelques instants clés, agrandis, pour inspection
-npx tsx src/cli/render.ts --spell fire-rising-gout --inspect 0.2,0.4,0.6,0.8 --inspectScale 3
-
-# planches de contrôle : couleur, sans lumière, silhouettes seules
-npx tsx src/cli/board.ts --scale 2
-npx tsx src/cli/board.ts --raw --out out/planche-sans-lumiere.png
-npx tsx src/cli/board.ts --silhouette --raw --out out/planche-silhouettes.png
-```
-
-L'atelier web est un **site statique** : il n'a ni backend ni compte. Il se sert
-par HTTP — `npm run dev` en développement, `dist/atelier.html` en production.
-Un double-clic sur un fichier local ne suffit pas toujours : les modules ES
-demandent une origine HTTP(S).
-
-## Carte du dépôt
-
-```
-src/core/       math, aléatoire déterministe
-src/space/      projection isométrique, repères locaux, directions exportées
-src/raster/     framebuffer RGBA, masques de couverture, tramage ordonné
-src/render/     commandes de dessin, renderer, limites de capture
-src/style/      StyleProfile, palettes par rôle
-src/grammar/    primitives par famille : solides, débris, sol, givre, décharges, corps mous
-src/sim/        contrat des recettes, événements
-src/spells/     les six recettes
-src/export/     PNG, GIF, planches, manifeste versionné
-src/cli/        rendu par lots, diagnostic de cadrage, planche de contrôle
-web/            atelier de lecture (React + Vite)
-tests/          invariants du moteur
-docs/           architecture, conventions spatiales, contrat d'export, avancement
-```
-
-## Planches de contrôle
-
-![Catalogue élémentaire : six sorts, cinq instants](docs/planches/catalogue.png)
-
-Les mêmes formes sans passe lumière et en silhouettes seules —
-[`catalogue-sans-lumiere.png`](docs/planches/catalogue-sans-lumiere.png),
-[`catalogue-silhouettes.png`](docs/planches/catalogue-silhouettes.png) — servent
-à vérifier que chaque identité tient **sans glow et sans couleur**. Les
-animations complètes sont dans [`docs/planches/`](docs/planches/).
+Les autres commandes — planches, animations de contrôle, inspection des bornes,
+résumé mesuré — sont listées dans [`docs/export.md`](docs/export.md).
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md) — modules, flux de données, décisions
-- [`docs/conventions-spatiales.md`](docs/conventions-spatiales.md) — repères, projection, caps, conversions Unity
-- [`docs/format-recette.md`](docs/format-recette.md) — contrat d'une recette et grammaires élémentaires
-- [`docs/export.md`](docs/export.md) — manifeste, atlas, pivots, intégration runtime
-- [`docs/avancement.md`](docs/avancement.md) — jalon atteint, preuves, limites connues, prochaine étape
+| Document | Contenu |
+|---|---|
+| [`docs/bible-arcane-miniature.md`](docs/bible-arcane-miniature.md) | La direction artistique, et comment chaque règle se vérifie |
+| [`docs/architecture.md`](docs/architecture.md) | Modules, décisions et leurs raisons, coût mesuré |
+| [`docs/conventions-spatiales.md`](docs/conventions-spatiales.md) | Repères, projection, caps, capacités directionnelles |
+| [`docs/formats.md`](docs/formats.md) | Recette, motif, projet, retouche, et tous les diagnostics |
+| [`docs/export.md`](docs/export.md) | Contenu d'un pack, manifeste, commandes, Unity |
+| [`docs/avancement.md`](docs/avancement.md) | État réel jalon par jalon et prochaine action |
+| [`unity/README.md`](unity/README.md) | Intégration Unity et son état de validation |
 
-## Conventions de code
+## Limites de cette version
 
-- TypeScript strict, `noUncheckedIndexedAccess` activé, aucun `any`.
-- Les commentaires expliquent **pourquoi**, pas ce que le code fait déjà lire.
-- Aucun opérateur inconnu n'est masqué par un repli visuellement plausible :
-  une recette qui demande quelque chose d'absent échoue avec le nom du champ.
+- Aucun **test de reconnaissance avec des participants** n'a été mené : les
+  neuf sorts passent une mesure automatique de distinction, aucun taux n'est
+  annoncé.
+- **Unity n'a pas été exécuté** ici : le code d'intégration est fourni et relu,
+  sa validation réelle reste ouverte.
+- L'**eau et les réactions** (eau + foudre, eau + glace) ne sont pas
+  implémentées ; les neuf autres éléments de la matrice sont des concepts
+  déclarés comme tels dans le catalogue.
+- Les **passes avant/arrière** existent dans le renderer mais ne sont pas
+  pilotées depuis l'atelier ; le tri en profondeur reste global par objet et ne
+  résout pas deux rubans qui se croisent.
+- L'atelier ne propose pas encore la **sélection de clusters**, le remplacement
+  de motif ni l'import de PNG + JSON externes.
+
+Les ressources livrées sont originales. Aucun sprite extrait d'un jeu
+commercial n'est inclus.

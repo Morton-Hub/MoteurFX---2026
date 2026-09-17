@@ -1,129 +1,71 @@
-# Conventions spatiales
+# Conventions de projection et de direction
 
-Quatre repères sont distingués explicitement. Les confondre est la source la
-plus courante de sprites qui « glissent » entre deux caps.
+Quatre repères sont distingués. Les confondre est la cause la plus courante de
+sprites qui glissent d'un cap à l'autre.
 
-## 1. Le monde
+## 1. Monde
 
-- Sol `(x, y)` en **tuiles**, hauteur `z` en **tuiles**.
-- Repère direct, `z` vers le haut.
-- Le cap horizontal `0` rad pointe vers `+x`, et croît vers `+y`.
-- Une direction est toujours calculée par `cible − source` **dans le plan du
-  sol** : la différence de hauteur n'entre jamais dans le cap.
+- Sol `(x, y)` en **tuiles**, hauteur `z` en **tuiles**, repère direct.
+- Le cap `0` pointe vers `+x` et croît vers `+y`.
+- Toutes les tailles de recette sont en tuiles, jamais en pixels : une recette
+  ne connaît pas la taille du canevas.
 
-## 2. Le repère local du sort
+## 2. Repère local du sort
 
-`(avant, côté, haut)`, obtenu par rotation du repère monde autour de l'axe
-vertical.
+`makeFrame(origine, cap)` donne `avant`, `côté`, `haut`. Une recette exprime
+« 30 cm devant la main, à gauche » sans jamais manipuler d'angle d'écran.
 
-```
-avant = ( cos θ,  sin θ, 0)
-côté  = (−sin θ,  cos θ, 0)
-haut  = (     0,      0, 1)
-```
+## 3. Caméra
 
-Une recette construit sa géométrie dans ce repère (`ctx.wl(avant, côté, haut)`),
-puis le moteur projette. Aucune orientation n'est fabriquée en faisant tourner
-ou en retournant une image finale.
-
-## 3. La caméra
-
-Projection orthographique isométrique :
-
-```
-screenX = originX + groundScale × (x − y)
-screenY = originY + groundScale × groundRatio × (x + y) − heightScale × z
+```text
+screenX = originX + groundScale * (x - y)
+screenY = originY + groundScale * groundRatio * (x + y) - heightScale * z
 ```
 
-- `groundRatio` vaut `0.5` par défaut — le ratio de sol 2:1 — et il est
-  **configurable** : il n'est codé en dur dans aucune primitive.
-- `heightScale` est **indépendant** de `groundScale`. Un objet haut ne
-  s'écrase pas sous prétexte que le sol est projeté en 2:1.
-- `originX, originY` est le **pivot** : la position en pixels de la source du
-  sort dans le canevas. Il est identique pour tous les caps.
+`groundRatio = 0,5` correspond au profil de sol 2:1. Le ratio n'est recopié
+dans aucun opérateur : la direction de caméra et le plan face caméra en sont
+**déduits** (`cameraDir`, `cameraPlane`), de sorte qu'un autre profil de
+projection reste cohérent.
 
-L'inverse `unprojectGround` ramène un point écran sur le sol `z = 0`. C'est la
-conversion à utiliser quand l'utilisateur vise à la souris : on revient au sol,
-**puis** on calcule la direction.
+`heightScale` est indépendant de `groundScale` : un objet haut ne s'écrase pas
+sous prétexte que le sol est projeté en 2:1.
 
-L'axe de vue est déduit du profil par `cameraDir` : c'est le vecteur monde dont
-la projection est nulle. C'est lui qui élimine les faces arrière, sans que le
-ratio 2:1 ait besoin d'être supposé quelque part.
+## 4. Image
 
-### Cas dégénéré
+Pixels logiques, origine en haut à gauche, `y` vers le bas. Le pivot d'un
+export est la projection de la cible au sol : il ne bouge pas d'un cap à
+l'autre, ce qui est la condition d'un changement de direction sans saut.
 
-Si source et cible sont confondues, `headingFromTo` renvoie le cap de repli
-fourni par l'appelant. Le comportement est défini ; il ne produit jamais `NaN`.
+## Contrat directionnel
 
-## 4. Les pixels
+- Le système accepte un cap quelconque sur 360°.
+- Les exports standards couvrent 8 et 16 caps ; tout `N ≥ 1` est accepté.
+- Les caps sont échantillonnés **dans le monde**, avec un angle initial
+  explicite. Leurs angles à l'écran ne sont donc pas régulièrement espacés —
+  c'est exactement pourquoi l'échantillonnage n'est pas fait à l'écran.
+- Chaque cap exporté déclare son angle monde, son vecteur et son angle écran.
+- Une spritesheet finie n'est pas un rendu continu exact.
 
-Origine en haut à gauche, `y` vers le bas. Le rendu de référence se fait à la
-résolution native, **sans anti-crénelage**. Le seul agrandissement autorisé est
-entier et sans lissage.
+## Capacités directionnelles des ressources
 
-## Caps exportés
+Chaque motif déclare ce qu'il sait faire :
 
-- Le moteur accepte un cap arbitraire sur 360°.
-- L'export propose 8 et 16 directions en standard ; `N` est configurable, avec
-  un angle initial explicite.
-- Les directions sont échantillonnées **dans le repère monde**. Leurs angles
-  projetés à l'écran ne sont donc pas régulièrement espacés — un test le
-  vérifie explicitement.
-- Le manifeste stocke le vecteur monde et l'angle en radians. Le label (`E`,
-  `NE`, …) est informatif : il ne définit aucun contrat.
-- Une spritesheet à 8 ou 16 directions est une **approximation discrète** d'un
-  moteur à cap libre. Son playback ne doit pas être présenté comme un rendu
-  continu exact.
-- `pickDirection` choisit le cap exporté le plus proche, avec une hystérésis
-  optionnelle en radians qui empêche l'oscillation entre deux caps voisins.
+| Capacité | Sens | Exemple livré |
+|---|---|---|
+| `procedural` | La structure est reconstruite pour chaque cap | prismes, masses de feu, réseaux de foudre |
+| `drawn-8` / `drawn-16` | Le motif possède 8 ou 16 jeux de dessins | aucun à ce jour |
+| `billboard` | Le dessin fait face à la caméra, son attache vit dans le monde | langue de feu, éclat de cristal, fumée |
+| `radial` | Rendu partageable entre caps, invariance réelle | braise, étincelle, marque au sol |
 
-Aucune recette du catalogue n'est déclarée radiale. Un effet réellement
-invariant par rotation pourrait partager un rendu, à condition de le déclarer
-(`radial: true`) — et le test de déterminisme vérifie alors la cohérence.
+Un angle libre demandé à un motif dessiné en huit directions ne crée pas de
+nouveaux dessins. Le miroir horizontal est autorisé **uniquement** si la
+ressource le déclare ; `mirrorPairs` documente pourquoi cinq dessins suffisent
+à huit caps dans cette projection, et une transformation non déclarée lève une
+erreur au lieu de casser silencieusement la lumière.
 
-## Profondeur 2.5D
+## Hystérésis
 
-```
-depthOf(p) = (p.x + p.y) × 64 − p.z
-```
-
-Croissante vers l'observateur : une commande de clé plus grande est peinte
-après. La profondeur au sol domine ; la hauteur ne sert que de départage pour
-une même cellule, de sorte que le bas d'une colonne passe devant son sommet.
-
-**Limite assumée** : un tri global ne résout pas les intersections réelles. Une
-image aplatie ne peut pas entourer correctement un personnage quelconque. Le
-renderer accepte une option `depthRange` qui permet de produire deux passes
-avant / arrière synchronisées ; les intersections complexes demandent une autre
-solution, que ce moteur ne prétend pas fournir.
-
-## Ombres, traînées, contact
-
-- Les ombres sont projetées depuis la **position au sol** `(x, y, 0)`, jamais
-  depuis la hauteur visuelle.
-- Les traînées suivent la tangente réelle de la trajectoire, calculée à partir
-  de la vitesse analytique du mobile.
-- Les débris et les jets ont un **cône d'émission orienté** autour d'un axe
-  monde donné (`coneDirection`).
-- Le point de contact correspond à la cible quel que soit le cap : un test le
-  vérifie pour les 16 directions.
-
-## Conversion vers Unity
-
-Unity utilise un repère gaucher avec `y` vers le haut. La correspondance :
-
-| MoteurFX | Unity |
-|---|---|
-| `x` (sol) | `x` |
-| `y` (sol) | `z` |
-| `z` (hauteur) | `y` |
-| cap θ (rad, 0 = +x, vers +y) | `Quaternion.Euler(0, −θ × Rad2Deg, 0)` |
-
-Les **pixels par unité** se déduisent de `groundScale` du manifeste : avec
-`groundScale = 22` et une tuile de sol d'une unité Unity, l'import se fait à
-22 pixels par unité. Le pivot du sprite se règle sur `manifest.pivot`, exprimé
-en pixels depuis le coin haut-gauche du canevas, avant tout rognage.
-
-> L'environnement Unity n'est pas disponible dans ce dépôt : le contrat de
-> conversion est documenté et testé côté moteur, **son exécution dans Unity
-> reste à valider**.
+`pickDirection(dirs, cap, courant, marge)` ne quitte le cap courant que si un
+autre est meilleur d'au moins la marge. Sans cela, un personnage qui pivote
+fait clignoter le sprite entre deux directions voisines. Le lecteur Unity
+applique la même règle, avec la marge exprimée en degrés.
