@@ -87,11 +87,11 @@
       144
     ],
     "silhouettePx": [
-      87,
+      88,
       69
     ],
     "colors": 8,
-    "msPerFrame": 3.7
+    "msPerFrame": 4
   },
   {
     "id": "fire-dragon-pillar-m",
@@ -170,10 +170,10 @@
     ],
     "silhouettePx": [
       110,
-      90
+      92
     ],
     "colors": 9,
-    "msPerFrame": 1.8
+    "msPerFrame": 2
   },
   {
     "id": "fire-comet-heart-l",
@@ -268,10 +268,10 @@
     ],
     "silhouettePx": [
       153,
-      144
+      147
     ],
     "colors": 14,
-    "msPerFrame": 2.5
+    "msPerFrame": 2.7
   },
   {
     "id": "ice-aurora-needle-s",
@@ -365,7 +365,7 @@
       83
     ],
     "colors": 7,
-    "msPerFrame": 0.8
+    "msPerFrame": 0.9
   },
   {
     "id": "ice-frost-garden-m",
@@ -447,7 +447,7 @@
       93
     ],
     "colors": 6,
-    "msPerFrame": 1.3
+    "msPerFrame": 1.4
   },
   {
     "id": "ice-boreal-cathedral-l",
@@ -529,7 +529,7 @@
       123
     ],
     "colors": 6,
-    "msPerFrame": 2.5
+    "msPerFrame": 2.9
   },
   {
     "id": "lightning-storm-thread-s",
@@ -615,7 +615,7 @@
       59
     ],
     "colors": 6,
-    "msPerFrame": 1
+    "msPerFrame": 1.2
   },
   {
     "id": "lightning-ionic-ricochet-m",
@@ -783,6 +783,6 @@
       120
     ],
     "colors": 6,
-    "msPerFrame": 0.9
+    "msPerFrame": 1.1
   }
 ]

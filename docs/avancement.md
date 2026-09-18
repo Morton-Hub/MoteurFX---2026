@@ -85,6 +85,35 @@ selon le cap :
 
 Les canaux principaux ont aussi été épaissis au moment de la connexion.
 
+## Passe « moins géométrique »
+
+Les formes en feuille parties, un défaut plus discret restait : les flammes se
+lisaient comme des **cônes**. La cause était dans la construction, pas dans le
+tramage — chaque masse était un ruban à largeur monotone et symétrique autour
+de sa ligne médiane. Une telle loi de largeur ne peut produire qu'un tronc de
+cône ou un fuseau, quelle que soit la palette posée dessus.
+
+| Cause | Correction |
+|---|---|
+| Ruban symétrique : même largeur à gauche et à droite | Les deux bords sont donnés séparément. Une flamme gonfle d'un côté pendant qu'elle rentre de l'autre |
+| Largeur strictement décroissante | Trois sinusoïdes de fréquences non entières entre elles, à phases tirées du germe : le bord avance et recule trois ou quatre fois sur la hauteur, avec un décalage vers le dehors pour que le battement gonfle plus qu'il ne creuse |
+| Six échantillons sur toute la hauteur | Seize pour le fût, douze par langue — en dessous, les segments sont si longs que le contour ne peut pas onduler |
+| Masse basse en ellipse exacte | Contour irrégulier, qui gonfle et rentre — l'ellipse donnait la « boule ronde uniformément orange » que le style refuse |
+| Langue à décroissance régulière | Épaisseur tenue longtemps puis fermeture brusque. La décroissance régulière donnait des bois de cerf, pas une flamme |
+| Pied de colonne posé sur rien | Évasement au contact du sol : la matière s'étale avant de monter |
+
+Le fût serpente aussi, par deux vagues lentes déphasées plutôt que par un
+bruit par échantillon : une colonne de feu se tord, elle ne grésille pas.
+
+**Ce que cette passe n'a pas obtenu.** J'ai tenté d'ajouter un test qui mesure
+le caractère du contour — le nombre d'inversions de sens des bords gauche et
+droit, une valeur basse pour un cône, haute pour une masse dessinée. Mesurée
+sur l'image composée, la valeur est noyée par les braises et les décalques ;
+mesurée sur la géométrie isolée, les plages avec et sans bosses se recouvrent
+(4 à 7 contre 3 à 5). Le test aurait été vert dans les deux cas : il n'aurait
+rien gardé. Il n'a donc pas été retenu, et cette correction-là repose sur la
+vérification visuelle seule.
+
 ## Contrôles automatiques en place
 
 75 tests, dont ceux qui gardent les promesses du document :

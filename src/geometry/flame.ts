@@ -30,8 +30,20 @@ function hashId(id: string): number {
   return h >>> 0;
 }
 
-/** Ruban fermé autour d'une ligne médiane, largeur perpendiculaire à l'axe. */
-function ribbon(center: readonly P[], widths: readonly number[]): P[] {
+/**
+ * Ruban fermé autour d'une ligne médiane, largeur perpendiculaire à l'axe.
+ *
+ * Les deux bords sont donnés **séparément**. Un ruban symétrique — même
+ * largeur à gauche et à droite — produit un profil en fuseau parfait : c'est
+ * exactement ce qui faisait lire les flammes comme des cônes. Une flamme
+ * réelle est déséquilibrée : elle gonfle d'un côté pendant qu'elle rentre de
+ * l'autre.
+ */
+function ribbon(
+  center: readonly P[],
+  widthsL: readonly number[],
+  widthsR: readonly number[] = widthsL,
+): P[] {
   const n = center.length;
   const left: P[] = [];
   const right: P[] = [];
@@ -43,22 +55,34 @@ function ribbon(center: readonly P[], widths: readonly number[]): P[] {
     const len = Math.hypot(du, dv) || 1;
     const nu = dv / len;
     const nv = -du / len;
-    const w = (widths[i] ?? 0) * 0.5;
     const c = center[i] as P;
-    left.push({ u: c.u + nu * w, v: c.v + nv * w });
-    right.push({ u: c.u - nu * w, v: c.v - nv * w });
+    const wl = (widthsL[i] ?? 0) * 0.5;
+    const wr = (widthsR[i] ?? widthsL[i] ?? 0) * 0.5;
+    left.push({ u: c.u + nu * wl, v: c.v + nv * wl });
+    right.push({ u: c.u - nu * wr, v: c.v - nv * wr });
   }
   return [...left, ...right.reverse()];
 }
 
-/** Ellipse approchée par un polygone, en coordonnées de plan. */
-function ellipse(cu: number, cv: number, ru: number, rv: number, steps = 12): P[] {
-  const out: P[] = [];
-  for (let i = 0; i < steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    out.push({ u: cu + Math.cos(a) * ru, v: cv + Math.sin(a) * rv });
-  }
-  return out;
+/**
+ * Bosses le long d'un bord.
+ *
+ * Trois sinusoïdes de fréquences non entières entre elles, à phases tirées du
+ * germe : le bord avance et recule trois ou quatre fois sur la hauteur, sans
+ * jamais repasser par le même motif. C'est ce battement — et non le bruit
+ * pixel par pixel — qui fait qu'une silhouette se lit comme de la matière
+ * vivante plutôt que comme un solide de révolution.
+ */
+function lobes(k: number, seed: number, lane: number, amp: number): number {
+  const p1 = randN(seed, lane, 31) * Math.PI * 2;
+  const p2 = randN(seed, lane, 32) * Math.PI * 2;
+  const p3 = randN(seed, lane, 33) * Math.PI * 2;
+  const wave =
+    0.55 * Math.sin(k * 7.3 + p1) + 0.3 * Math.sin(k * 12.1 + p2) + 0.15 * Math.sin(k * 19.7 + p3);
+  // Décalé vers le dehors : les bosses gonflent plus qu'elles ne creusent.
+  // Centré sur zéro, le battement amincissait la masse autant qu'il la
+  // gonflait, et la colonne finissait en bâton ondulé.
+  return 1 + amp * (wave + 0.5);
 }
 
 export type TongueOptions = {
@@ -135,21 +159,49 @@ export function flameBody(ctx: FrameContext, o: TongueOptions): FlameBody {
   const shape = o.core ?? 'blob';
   const bodyH = shape === 'column' ? o.height * 0.78 : o.height * bodyRatio;
   if (shape === 'column') {
-    const steps = 6;
+    // Assez de points pour que le contour puisse réellement onduler. Avec six
+    // échantillons sur toute la hauteur, les segments sont si longs que le fût
+    // se lit comme un tronc de cône, quelle que soit la loi de largeur.
+    const steps = 16;
     const center: P[] = [];
-    const widths: number[] = [];
+    const wl: number[] = [];
+    const wr: number[] = [];
     for (let s = 0; s <= steps; s++) {
       const k = s / steps;
-      // Le fût ondule légèrement et se resserre en montant : une colonne de
-      // feu n'est pas un tuyau.
-      const sway = (randN(seed, s, 7) - 0.5) * o.width * 0.22;
+      // Le fût serpente : deux vagues lentes, déphasées, plutôt qu'un bruit
+      // par échantillon — une colonne de feu se tord, elle ne grésille pas.
+      const sway =
+        o.width *
+        (0.3 * Math.sin(k * 4.1 + phase * 2 + randN(seed, 0, 7) * 6.283) +
+          0.16 * Math.sin(k * 9.3 + randN(seed, 1, 7) * 6.283));
       center.push({ u: sway * k, v: bodyH * k });
-      const taper = 1 - (1 - (o.topRatio ?? 0.55)) * k;
-      widths.push(o.width * taper * (1 + 0.1 * Math.sin(k * 5 + phase * 3)));
+      // Le rétrécissement reste, mais il est mangé par les bosses : le bord
+      // gauche et le bord droit ont leur propre battement.
+      const taper = 1 - (1 - (o.topRatio ?? 0.55)) * k ** 0.85;
+      // Le feu s'évase là où il touche le sol : la matière s'étale avant de
+      // monter. Sans ce pied, la colonne est posée sur rien.
+      const flare = 1 + 0.35 * Math.max(0, 1 - k * 5) ** 2;
+      const base = o.width * taper * flare;
+      wl.push(base * lobes(k, seed, 1, 0.34));
+      wr.push(base * lobes(k, seed, 2, 0.34));
     }
-    push(ribbon(center, widths));
+    push(ribbon(center, wl, wr));
   } else {
-    push(ellipse(0, bodyH * 0.55, o.width * 0.5, bodyH * 0.62, 14));
+    // La masse basse n'est pas une ellipse : c'est un contour irrégulier qui
+    // gonfle et rentre. Une ellipse donne la « boule ronde uniformément
+    // orange » que le style refuse (§3).
+    const steps = 18;
+    const blob: P[] = [];
+    for (let s = 0; s < steps; s++) {
+      const a = (s / steps) * Math.PI * 2;
+      const k = a / (Math.PI * 2);
+      const r = lobes(k, seed, 3, 0.3);
+      blob.push({
+        u: Math.cos(a) * o.width * 0.5 * r,
+        v: bodyH * 0.55 + Math.sin(a) * bodyH * 0.62 * r,
+      });
+    }
+    push(blob);
   }
 
   // 2. Les langues. Chacune part de la masse et monte, plus ou moins haut.
@@ -167,20 +219,29 @@ export function flameBody(ctx: FrameContext, o: TongueOptions): FlameBody {
       (0.85 + 0.35 * randN(seed, i, 5)) *
       (shape === 'column' ? 1.5 : 1);
 
-    const steps = 6;
+    const steps = 12;
     const center: P[] = [];
-    const widths: number[] = [];
+    const wl: number[] = [];
+    const wr: number[] = [];
     for (let s = 0; s <= steps; s++) {
       const k = s / steps;
+      // La langue ne monte pas droit : elle ondule avant de se crocher.
+      const waver = o.width * 0.14 * Math.sin(k * 5.5 + randN(seed, i, 8) * 6.283);
       center.push({
-        u: baseU + hook * k * k + t * spread * 0.4 * k,
+        u: baseU + hook * k * k + t * spread * 0.4 * k + waver * k,
         v: (shape === 'column' ? bodyH * 0.9 : bodyH * 0.3) + len * k,
       });
-      // Épaisse à la racine, pointue au bout, avec une seule inflexion : une
-      // langue dessinée, pas une dentelure aléatoire.
-      widths.push(wBase * (1 - k) ** 0.62 * (1 + 0.22 * Math.sin(k * 2.4 + i)));
+      // Épaisse à la racine, pointue au bout — mais le bord gonfle et rentre
+      // en chemin, et pas des deux côtés au même endroit. Sans ce déséquilibre
+      // la langue redevient un triangle.
+      // La langue garde son épaisseur longtemps puis se ferme d'un coup. Une
+      // décroissance régulière donne une pointe filiforme — des bois de cerf,
+      // pas une flamme.
+      const base = wBase * (1 - k ** 1.7) ** 0.5;
+      wl.push(base * lobes(k, seed, 10 + i * 2, 0.36));
+      wr.push(base * lobes(k, seed, 11 + i * 2, 0.36));
     }
-    push(ribbon(center, widths));
+    push(ribbon(center, wl, wr));
     tips.push(project(center[steps] as P));
   }
 
