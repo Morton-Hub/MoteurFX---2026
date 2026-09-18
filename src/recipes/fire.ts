@@ -1,7 +1,7 @@
 /**
  * Famille du feu — trois rangs, trois constructions.
  *
- *  S  Pétale de braise  : une petite masse lancée, qui s'ouvre en pétales.
+ *  S  Poing de braise  : une petite masse lancée, qui éclate en gerbe montante.
  *  M  Pilier du dragon  : une colonne qui jaillit du sol et se déchire.
  *  L  Cœur de comète    : une masse rocheuse enflammée qui tombe du ciel.
  *
@@ -14,7 +14,7 @@ import { add3, norm3, scale3, type Vec3 } from '../core/math.js';
 import { getMaterial } from '../pixels/palette.js';
 import { paintRole } from '../pixels/shade.js';
 import { FIRE_LOBE, ROCK_CHIP } from '../motifs/index.js';
-import { flameBody, leanToward, openLobes, veinMask } from '../geometry/flame.js';
+import { flameBody, leanToward, veinMask } from '../geometry/flame.js';
 import { chunk } from '../geometry/forms.js';
 import { paintSolidObject, solidMask } from '../geometry/solid.js';
 import { groundCracks, paintGroundMark, paintGroundShadow } from '../geometry/ground.js';
@@ -28,24 +28,24 @@ import type { ParamBag, ParamSpec } from './params.js';
 import type { SpellBuilder } from './types.js';
 
 // ---------------------------------------------------------------------------
-// S — Pétale de braise
+// S — Poing de braise
 // ---------------------------------------------------------------------------
 
-const PETAL_PARAMS: ParamSpec[] = [
+const FIST_PARAMS: ParamSpec[] = [
   { key: 'emberSize', label: 'Taille de la braise', kind: 'number', default: 0.34, min: 0.15, max: 0.7, step: 0.01, unit: 'tuile', group: 'Silhouette' },
   { key: 'tongues', label: 'Langues', kind: 'integer', default: 3, min: 1, max: 5, step: 1, group: 'Silhouette' },
   { key: 'curl', label: 'Crochet', kind: 'number', default: 0.55, min: 0, max: 1, step: 0.05, group: 'Silhouette', help: 'Recourbement du bout des langues' },
   { key: 'trail', label: 'Longueur de traînée', kind: 'integer', default: 3, min: 0, max: 5, step: 1, group: 'Vol' },
   { key: 'flightArc', label: 'Cambrure du vol', kind: 'number', default: 0.3, min: 0, max: 1.2, step: 0.05, unit: 'tuile', group: 'Vol' },
-  { key: 'lobes', label: 'Pétales à l’ouverture', kind: 'integer', default: 3, min: 2, max: 5, step: 1, group: 'Impact' },
+  { key: 'lobes', label: 'Langues à l’éclatement', kind: 'integer', default: 3, min: 2, max: 5, step: 1, group: 'Impact' },
   { key: 'emberCount', label: 'Braises', kind: 'integer', default: 7, min: 0, max: 16, step: 1, group: 'Conséquence' },
   { key: 'smoke', label: 'Fumée', kind: 'number', default: 0.8, min: 0, max: 1, step: 0.1, group: 'Conséquence' },
 ];
 
 /** Positions de vol : espacements non uniformes, l'accélération se voit. */
-const PETAL_FLIGHT = [0.3, 0.6, 0.85];
+const FIST_FLIGHT = [0.3, 0.6, 0.85];
 
-function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
+function fistBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   const size = p.num('emberSize');
   const tongues = p.int('tongues');
   const curl = p.num('curl');
@@ -135,7 +135,7 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
 
   // --- Vol (3-5) : tête nette, traînée qui finit son mouvement après elle.
   if (i <= 5) {
-    const t = PETAL_FLIGHT[i - 3] ?? 0.5;
+    const t = FIST_FLIGHT[i - 3] ?? 0.5;
     const at = path.at(t);
     const ahead = path.at(Math.min(1, t + 0.06));
     const sa = ctx.p(at);
@@ -176,7 +176,7 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   if (i === 6) {
     out.push(groundGlow(ctx, { id: 'glow', centre: ground, radius: size * 2, level: 0.32 }));
     out.push(shadowPiece(ctx, 'shadow', impact, size * 1.4, 0.5));
-    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.12, radius: size * 3.4, petals: 7 }));
+    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.12, radius: size * 3.4, tongues: 7 }));
     const squashed = flameBody(ctx, {
       id: 'contact',
       anchor: { x: impact.x, y: impact.y, z: 0.18 },
@@ -214,7 +214,7 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     return out;
   }
 
-  // --- Ouverture (7-8) : trois pétales, et l'onde qui s'écarte au sol.
+  // --- Éclatement (7-8) : la masse monte en langues, et le sol se marque.
   if (i <= 8) {
     const k = i - 7;
     const opening = k === 0 ? 0.6 : 1;
@@ -223,29 +223,31 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         paintGroundMark(canvas, c, ctx.target, size * 2.4 * opening, 'fire.scorch', { id: 'scorch' });
       }),
     );
-    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.42 + 0.34 * k, radius: size * 3.4, petals: 7 }));
-    const lobeMask = openLobes(ctx, {
-      id: 'petals',
-      center: { x: impact.x, y: impact.y, z: 0.3 + 0.12 * opening },
-      radius: size * 4.2,
-      lobes,
-      opening,
+    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.42 + 0.34 * k, radius: size * 3.4, tongues: 7 }));
+    // Le cœur de l'impact est une **masse qui monte**, pas une corolle : une
+    // gerbe large en bas, des langues qui s'étirent et se crochent en haut.
+    const burst = flameBody(ctx, {
+      id: 'burst-core',
+      anchor: { x: impact.x, y: impact.y, z: 0.05 },
+      height: size * (4.6 + 1.4 * k),
+      width: size * (3.2 - 0.5 * k),
+      count: lobes + 2,
+      curl: 0.7,
+      phase: 0.45 + 0.3 * k,
+      holes: 1 + k,
+      bodyRatio: 0.42,
       seed: ctx.seed,
-      thickness: 0.46,
     });
     out.push(
       emissivePiece(ctx, {
-        id: 'petals',
-        mask: lobeMask,
+        id: 'burst-core',
+        mask: burst.mask,
         at: impact,
         material: 'fire.flame',
-        core: 3,
-        turbulence: 0.22,
-        bias: k === 1 ? -0.12 : 0,
+        core: 3.2,
+        turbulence: 0.26,
+        bias: k === 1 ? -0.14 : 0,
       }),
-    );
-    out.push(
-      motifPiece(ctx, { id: 'lobe-core', motif: FIRE_LOBE, at: { ...impact, z: 0.28 }, frame: k }),
     );
     out.push(...embers(ctx, { id: 'ember', at: impact, t: 0.32 + 0.26 * k, count: emberCount + 4, scale: size * 2.4 }));
     out.push(
@@ -261,32 +263,34 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   const k = i - 9;
   out.push(
     groundPiece('scorch', ctx.depth(ground) - 1.5, (canvas, c) => {
-      paintGroundMark(canvas, c, ctx.target, size * (2.4 - 0.25 * k), 'fire.scorch', {
+      paintGroundMark(canvas, c, ctx.target, size * (1.9 - 0.2 * k), 'fire.scorch', {
         id: 'scorch',
-        density: 0.85 - 0.2 * k,
+        density: 0.7 - 0.2 * k,
       });
     }),
   );
   if (k === 0) {
-    const lobeMask = openLobes(ctx, {
-      id: 'petals',
-      center: { x: impact.x, y: impact.y, z: 0.3 },
-      radius: size * 3.2,
-      lobes,
-      opening: 0.6,
+    const rest = flameBody(ctx, {
+      id: 'burst-core',
+      anchor: { x: impact.x, y: impact.y, z: 0.05 },
+      height: size * 2.4,
+      width: size * 1.9,
+      count: 3,
+      curl: 0.7,
+      phase: 0.85,
+      holes: 1,
       seed: ctx.seed,
-      thickness: 0.38,
     });
     out.push(
       emissivePiece(ctx, {
-        id: 'petals',
-        mask: lobeMask,
+        id: 'burst-core',
+        mask: rest.mask,
         at: impact,
         material: 'fire.flame',
         core: 2.4,
-        turbulence: 0.24,
-        bias: -0.25,
-        ceiling: 0.78,
+        turbulence: 0.26,
+        bias: -0.28,
+        ceiling: 0.8,
       }),
     );
   }
@@ -314,18 +318,18 @@ function petalBuild(ctx: FrameContext, p: ParamBag): Piece[] {
   return out;
 }
 
-export const FIRE_EMBER_PETAL: SpellBuilder = {
-  id: 'fire-ember-petal-s',
-  label: 'Pétale de braise',
+export const FIRE_EMBER_FIST: SpellBuilder = {
+  id: 'fire-ember-fist-s',
+  label: 'Poing de braise',
   element: 'fire',
   rank: 'S',
   action: 'projectile',
-  params: PETAL_PARAMS,
+  params: FIST_PARAMS,
   uses: {
     motifs: ['fire-ember-v1', 'fire-lobe-v1', 'fire-smoke-v1'],
     operators: ['flame-body', 'open-lobes', 'ground-mark'],
   },
-  build: petalBuild,
+  build: fistBuild,
 };
 
 // ---------------------------------------------------------------------------
@@ -489,7 +493,7 @@ function pillarBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       // Colonne ouverte : deux lobes latéraux élargissent la silhouette, et
       // l'onde de chaleur part au sol. Sans eux, la pose tenue ne se distingue
       // pas de la montée.
-      out.push(...fireNova(ctx, { id: 'nova', centre: foot, t: 0.25 + 0.4 * (i - 6), radius: girth * 2.1, petals: 6 }));
+      out.push(...fireNova(ctx, { id: 'nova', centre: foot, t: 0.25 + 0.4 * (i - 6), radius: girth * 2.1, tongues: 6 }));
       for (const sign of [1, -1] as const) {
         const lobeAt = {
           x: foot.x + Math.cos(ctx.heading) * sign * girth * 0.45,
@@ -876,7 +880,7 @@ function cometBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         paintGroundMark(canvas, c, ground, craterRadius * 0.8, 'fire.scorch', { id: 'crater', density: 0.9 });
       }),
     );
-    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.12, radius: craterRadius * 1.8, petals: 10 }));
+    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.12, radius: craterRadius * 1.8, tongues: 10 }));
     const crackMask = groundCracks(ctx, ground, {
       id: 'impact-cracks',
       seed: ctx.seed,
@@ -932,30 +936,35 @@ function cometBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         paintGroundMark(canvas, c, ground, craterRadius * (0.95 + 0.12 * k), 'fire.scorch', { id: 'crater', density: 0.9 });
       }),
     );
-    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.34 + 0.3 * k, radius: craterRadius * 1.8, petals: 10 }));
+    out.push(...fireNova(ctx, { id: 'nova', centre: ground, t: 0.34 + 0.3 * k, radius: craterRadius * 1.8, tongues: 10 }));
     if (k === 0) {
       const at: Vec3 = { x: ground.x, y: ground.y, z: coreSize * 0.35 };
       out.push(...rock(at, 'core', 0.9, 1.9));
     }
     if (k >= 1) {
-      const lobeMask = openLobes(ctx, {
+      // Colonne d'éclatement : la masse part vers le haut en s'ouvrant, elle
+      // ne s'étale pas en corolle.
+      const burst = flameBody(ctx, {
         id: 'burst',
-        center: { x: ground.x, y: ground.y, z: coreSize * 0.9 },
-        radius: craterRadius * 2.1,
-        lobes,
-        opening: k === 1 ? 0.85 : 0.6,
+        anchor: { x: ground.x, y: ground.y, z: 0.05 },
+        height: craterRadius * (2.6 + 0.6 * k),
+        width: craterRadius * (2 - 0.35 * k),
+        count: lobes + 3,
+        curl: 0.65,
+        phase: 0.5 + 0.25 * k,
+        holes: 2,
+        bodyRatio: 0.4,
         seed: ctx.seed,
-        thickness: 0.5,
       });
       out.push(
         emissivePiece(ctx, {
           id: 'burst',
-          mask: lobeMask,
+          mask: burst.mask,
           at: { x: ground.x, y: ground.y, z: coreSize },
           material: 'fire.flame',
           core: 3.4,
-          turbulence: 0.26,
-          bias: k === 2 ? -0.18 : 0,
+          turbulence: 0.28,
+          bias: k === 2 ? -0.2 : 0,
         }),
       );
     }
@@ -1051,7 +1060,7 @@ export const FIRE_COMET_HEART: SpellBuilder = {
 };
 
 export const FIRE_BUILDERS: readonly SpellBuilder[] = [
-  FIRE_EMBER_PETAL,
+  FIRE_EMBER_FIST,
   FIRE_DRAGON_PILLAR,
   FIRE_COMET_HEART,
 ];

@@ -207,71 +207,16 @@ export function flameBody(ctx: FrameContext, o: TongueOptions): FlameBody {
   return { mask, tips, apex };
 }
 
-/**
- * Pétales d'ouverture : la conséquence d'un contact.
+/*
+ * `openLobes` — retiré.
  *
- * Un pétale est large en son milieu et pointu aux deux bouts — pas un secteur
- * angulaire, qui donne des planches. Trois lobes qui s'ouvrent entre les
- * fragments valent mieux qu'un disque qui grossit (§3).
+ * Cette fonction ouvrait une masse de feu en trois pétales symétriques posés
+ * dans le plan caméra. À cette taille, trois lobes de longueur voisine qui
+ * s'ouvrent autour d'un cœur se lisent comme une fleur ou un papillon, pas
+ * comme du feu : la lecture est plate et elle est la même dans les huit caps.
+ * L'éclatement est maintenant une **gerbe montante** (`flameBody`) — verticale,
+ * asymétrique, avec des langues de hauteurs inégales.
  */
-export function openLobes(
-  ctx: FrameContext,
-  o: {
-    id: string;
-    center: Vec3;
-    radius: number;
-    lobes?: number;
-    /** 0 = fermé, 1 = ouvert. */
-    opening: number;
-    seed: number;
-    /** Largeur d'un pétale, en fraction de sa longueur. */
-    thickness?: number;
-    /** Orientation générale des pétales, en radians dans le plan écran. */
-    rotation?: number;
-  },
-): ShapeMask {
-  const plane = cameraPlane(ctx.projection);
-  const lobes = Math.max(2, Math.round(o.lobes ?? 3));
-  const seed = o.seed ^ hashId(o.id);
-  const thickness = o.thickness ?? 0.42;
-  const rotation = o.rotation ?? Math.PI / 2;
-  const polys: Vec2[][] = [];
-  const all: Vec2[] = [];
-
-  const project = (p: P): Vec2 =>
-    ctx.p(add3(o.center, add3(scale3(plane.right, p.u), scale3(plane.up, p.v))));
-
-  for (let i = 0; i < lobes; i++) {
-    // Les pétales s'ouvrent vers le haut et sur les côtés, jamais vers le bas :
-    // une masse en feu monte.
-    const spread = Math.PI * 0.86;
-    const a = rotation - spread / 2 + (spread * (i + 0.5)) / lobes + (randN(seed, i, 1) - 0.5) * 0.25;
-    const len = o.radius * (0.55 + 0.8 * randN(seed, i, 2)) * (0.35 + 0.65 * o.opening);
-    const steps = 5;
-    const center: P[] = [];
-    const widths: number[] = [];
-    const bend = (randN(seed, i, 3) - 0.5) * 0.7;
-    for (let s = 0; s <= steps; s++) {
-      const k = s / steps;
-      const angle = a + bend * k * k;
-      center.push({ u: Math.cos(angle) * len * k, v: Math.sin(angle) * len * k * 1.08 });
-      // Profil de pétale : nul au centre, maximal vers 45 %, pointu au bout.
-      widths.push(len * thickness * Math.sin(Math.PI * Math.min(1, k * 1.15)) ** 0.8);
-    }
-    const poly = ribbon(center, widths).map(project);
-    polys.push(poly);
-    all.push(...poly);
-  }
-  // Cœur : il relie les pétales entre eux, sinon l'ouverture se lit comme
-  // trois objets indépendants.
-  const heart = ellipse(0, 0, o.radius * 0.16, o.radius * 0.14, 10).map(project);
-  polys.push(heart);
-  all.push(...heart);
-
-  const mask = ctx.mask(all, 2);
-  for (const p of polys) mask.addPolygon(p);
-  return mask;
-}
 
 /**
  * Angle d'inclinaison à donner à une masse de feu pour qu'elle pointe dans

@@ -19,11 +19,11 @@ const STYLE = 'arcane-miniature';
 
 export const FIRE_S: RecipeDefinition = {
   schemaVersion: SCHEMA_VERSION,
-  id: 'fire-ember-petal-s',
+  id: 'fire-ember-fist-s',
   familyId: 'fire-ember',
   rank: 'S',
-  name: 'Pétale de braise',
-  builder: 'fire-ember-petal-s',
+  name: 'Poing de braise',
+  builder: 'fire-ember-fist-s',
   seed: 1471,
   style: STYLE,
   element: 'fire',
@@ -48,7 +48,7 @@ export const FIRE_S: RecipeDefinition = {
       { id: 'cast', frame: 0, note: 'la main rassemble la braise' },
       { id: 'release', frame: 2 },
       { id: 'contact', frame: 6 },
-      { id: 'peak', frame: 7, note: 'ouverture maximale des pétales' },
+      { id: 'peak', frame: 7, note: 'gerbe montante à son maximum' },
       { id: 'settle', frame: 9 },
       { id: 'clear', frame: 11 },
     ],
@@ -68,7 +68,7 @@ export const FIRE_S: RecipeDefinition = {
   },
   stage: { width: 184, height: 144, distance: 2.6, casterHeight: 0.55, targetAt: { x: 0.52, y: 0.6 } },
   silhouette:
-    'Une petite masse crochue, lancée à hauteur de main, qui s’ouvre en trois pétales au contact et laisse des braises.',
+    'Une petite masse crochue, lancée à hauteur de main, qui éclate au contact en une gerbe de langues montantes et laisse des braises.',
 };
 
 export const FIRE_M: RecipeDefinition = {
@@ -473,7 +473,7 @@ export const FAMILIES: readonly EvolutionFamily[] = [
     label: 'Braise',
     element: 'fire',
     signature: {
-      S: 'Masse lancée, ouverture en pétales, braises',
+      S: 'Masse lancée, éclatement en gerbe, braises',
       M: 'Colonne ancrée au sol, pose tenue, déchirement',
       L: 'Masse rocheuse venue du ciel, impact lourd, fragments',
     },
@@ -522,7 +522,7 @@ export const ELEMENT_MATRIX: readonly CatalogueEntry[] = [
   {
     element: 'fire', label: 'Feu', status: 'delivered',
     ranks: {
-      S: { name: 'Pétale de braise', pitch: 'petite masse lancée, contact en pétales' },
+      S: { name: 'Poing de braise', pitch: 'petite masse lancée, contact en gerbe montante' },
       M: { name: 'Pilier du dragon', pitch: 'colonne qui jaillit du sol et se déchire' },
       L: { name: 'Cœur de comète', pitch: 'météore rocheux enflammé, chute et fragmentation' },
     },

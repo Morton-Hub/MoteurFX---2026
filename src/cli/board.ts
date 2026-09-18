@@ -35,6 +35,8 @@ export type BoardOptions = {
   readonly directions?: number;
   /** Cellules par ligne. 12 = une recette par ligne ; 4 = grille 4x3. */
   readonly columns?: number;
+  /** Sous-ensemble d'images, pour inspecter une phase de près. */
+  readonly frames?: readonly number[];
 };
 
 const BACKGROUNDS: Record<string, [number, number, number, number]> = {
@@ -78,7 +80,8 @@ export function buildBoard(o: BoardOptions): Framebuffer {
         heading,
         seed: def.seed,
       });
-      const frames = renderClip(compiled, stage);
+      const all = renderClip(compiled, stage);
+      const frames = o.frames && o.frames.length > 0 ? o.frames.map((i) => all[i]!).filter(Boolean) : all;
       rows.push({
         label: def.id,
         images: frames.map((f) => frameImage(f, o.mode)),
@@ -89,8 +92,9 @@ export function buildBoard(o: BoardOptions): Framebuffer {
   }
   const cellW = Math.max(...rows.map((r) => r.w));
   const cellH = Math.max(...rows.map((r) => r.h));
-  const columns = Math.max(1, Math.min(12, o.columns ?? 12));
-  const linesPerRow = Math.ceil(12 / columns);
+  const cells = rows[0]?.images.length ?? 12;
+  const columns = Math.max(1, Math.min(cells, o.columns ?? cells));
+  const linesPerRow = Math.ceil(cells / columns);
   const sheet = new Framebuffer(cellW * columns, cellH * rows.length * linesPerRow);
   sheet.fill(o.background as [number, number, number, number]);
   rows.forEach((row, ri) => {
@@ -204,7 +208,7 @@ function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const recipes = args['all']
     ? listRecipes()
-    : String(args['recipe'] ?? 'fire-ember-petal-s')
+    : String(args['recipe'] ?? 'fire-ember-fist-s')
         .split(',')
         .map((id) => getRecipe(id.trim()));
   const out = String(args['out'] ?? 'docs/planches/planche.png');
@@ -235,6 +239,9 @@ function main(): void {
     background,
     ...(args['directions'] ? { directions: Number(args['directions']) } : {}),
     ...(args['columns'] ? { columns: Number(args['columns']) } : {}),
+    ...(args['frames']
+      ? { frames: String(args['frames']).split(',').map((v) => Number(v.trim()) - 1) }
+      : {}),
   });
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, encodePng(board));

@@ -41,7 +41,7 @@ function main(): void {
   const outDir = String(args['out'] ?? 'out');
   const recipes = args['all']
     ? listRecipes()
-    : String(args['recipe'] ?? 'fire-ember-petal-s')
+    : String(args['recipe'] ?? 'fire-ember-fist-s')
         .split(',')
         .map((id) => getRecipe(id.trim()));
 

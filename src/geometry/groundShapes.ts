@@ -50,80 +50,16 @@ export function groundRing(
   return mask;
 }
 
-/**
- * Pétales rayonnants au sol : la forme d'une nova de feu. Chaque pétale est
- * large à sa racine et pointu au bout — pas un secteur angulaire.
+/*
+ * `groundPetals` et `groundSpikes` — retirés.
+ *
+ * Les deux peignaient des polygones **couchés au sol** en couronne autour de
+ * l'impact. Un polygone à plat n'a pas d'épaisseur à ombrer : il se lit comme
+ * une découpe de papier posée sur le décor — une feuille, exactement ce que le
+ * style refuse. Les novas construisent maintenant des volumes **debout**
+ * (langues de flamme pour le feu, prismes pour la glace), qui reçoivent la
+ * lumière et cachent correctement ce qui passe derrière.
  */
-export function groundPetals(
-  ctx: FrameContext,
-  o: {
-    id: string;
-    centre: Vec3;
-    radius: number;
-    count: number;
-    /** Rayon intérieur : le vide au centre d'une onde qui s'écarte. */
-    inner?: number;
-    width?: number;
-  },
-): ShapeMask {
-  const seed = ctx.seed ^ hashId(o.id);
-  const width = o.width ?? 0.7;
-  const inner = o.inner ?? 0;
-  const polys: Vec2[][] = [];
-  const all: Vec2[] = [];
-  for (let i = 0; i < o.count; i++) {
-    const base = ctx.heading + (i / o.count) * Math.PI * 2 + (randN(seed, i, 1) - 0.5) * 0.25;
-    const len = o.radius * (0.7 + 0.6 * randN(seed, i, 2));
-    const half = ((Math.PI * 2) / o.count) * 0.5 * width;
-    const poly: Vec2[] = [];
-    const steps = 4;
-    for (let s = 0; s <= steps; s++) {
-      const k = s / steps;
-      const r = inner + (len - inner) * k;
-      poly.push(polar(ctx, o.centre, r, base - half * (1 - k) ** 0.7));
-    }
-    for (let s = steps; s >= 0; s--) {
-      const k = s / steps;
-      const r = inner + (len - inner) * k;
-      poly.push(polar(ctx, o.centre, r, base + half * (1 - k) ** 0.7));
-    }
-    polys.push(poly);
-    all.push(...poly);
-  }
-  const mask = ctx.mask(all, 2);
-  for (const p of polys) mask.addPolygon(p);
-  return mask;
-}
-
-/**
- * Pointes rayonnantes au sol : la forme d'une cristallisation. Triangles
- * nets, longueurs inégales, aucune courbe.
- */
-export function groundSpikes(
-  ctx: FrameContext,
-  o: { id: string; centre: Vec3; radius: number; count: number; width?: number; inner?: number },
-): ShapeMask {
-  const seed = ctx.seed ^ hashId(o.id);
-  const width = o.width ?? 0.35;
-  const inner = o.inner ?? o.radius * 0.12;
-  const polys: Vec2[][] = [];
-  const all: Vec2[] = [];
-  for (let i = 0; i < o.count; i++) {
-    const a = ctx.heading + (i / o.count) * Math.PI * 2 + (randN(seed, i, 1) - 0.5) * 0.3;
-    const len = o.radius * (0.55 + 0.75 * randN(seed, i, 2));
-    const half = ((Math.PI * 2) / o.count) * 0.5 * width;
-    const poly = [
-      polar(ctx, o.centre, inner, a - half),
-      polar(ctx, o.centre, len, a + (randN(seed, i, 3) - 0.5) * 0.12),
-      polar(ctx, o.centre, inner, a + half),
-    ];
-    polys.push(poly);
-    all.push(...poly);
-  }
-  const mask = ctx.mask(all, 2);
-  for (const p of polys) mask.addPolygon(p);
-  return mask;
-}
 
 /**
  * Branches rayonnantes au sol, qui se divisent : la forme d'une décharge qui

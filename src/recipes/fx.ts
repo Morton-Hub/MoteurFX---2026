@@ -6,7 +6,7 @@
  * retirée, ce sont **ces** particules-là.
  *
  *  Feu     — braises qui montent et refroidissent, étincelles rapides, cendres
- *            qui retombent, fumée qui s'ouvre, nova en pétales au sol.
+ *            qui retombent, fumée qui s'ouvre, couronne de langues dressées au sol.
  *  Glace   — éclats rigides projetés, poudrin qui flotte, brume rasante,
  *            cristallisation en pointes au sol, éclats de lumière tenus une image.
  *  Foudre  — étincelles filantes, poussière statique attirée, rémanence
@@ -18,19 +18,17 @@
  */
 
 import { norm3, type Vec3 } from '../core/math.js';
+import { flameBody, leanToward } from '../geometry/flame.js';
+import { prism } from '../geometry/forms.js';
+import { paintSolidObject } from '../geometry/solid.js';
 import { getMaterial } from '../pixels/palette.js';
-import { paintEmissive, paintRole } from '../pixels/shade.js';
+import { paintRole } from '../pixels/shade.js';
 import { clusterMask, particleField, type EmitterOptions } from '../geometry/particles.js';
-import {
-  groundBlob,
-  groundBranches,
-  groundPetals,
-  groundRing,
-  groundSpikes,
-} from '../geometry/groundShapes.js';
+import { groundBlob, groundBranches, groundRing } from '../geometry/groundShapes.js';
+import { boltMask } from '../geometry/bolt.js';
 import type { FrameContext } from '../renderer/context.js';
 import type { Piece } from '../renderer/piece.js';
-import { groundPiece, piece } from './common.js';
+import { emissivePiece, groundPiece, piece } from './common.js';
 
 /** Vecteur du cap, dans le plan du sol. */
 export function forward(ctx: FrameContext): Vec3 {
@@ -218,58 +216,80 @@ export function ash(ctx: FrameContext, o: FxBase): Piece[] {
 }
 
 /**
- * Nova de feu : une onde de **pétales** au sol, creuse au centre, doublée
- * d'une couronne tramée. Ce n'est pas l'anneau lumineux universel : la forme
- * appartient à l'élément.
+ * Nova de feu : un **anneau de langues debout**.
+ *
+ * La première version posait des pétales à plat sur le sol. À cette échelle un
+ * polygone couché se lit comme une feuille découpée, pas comme du feu : il n'a
+ * ni volume, ni direction, ni bord chaud. Ici chaque langue est une vraie
+ * petite flamme, plantée sur un cercle du plan du sol, peinte à **sa** propre
+ * profondeur — celles de devant passent donc devant, et l'anneau s'ouvre en
+ * ellipse comme tout le reste de la scène.
  */
 export function fireNova(
   ctx: FrameContext,
-  o: { id: string; centre: Vec3; t: number; radius: number; petals?: number; depthBias?: number },
+  o: { id: string; centre: Vec3; t: number; radius: number; tongues?: number; depthBias?: number },
 ): Piece[] {
-  const radius = o.radius * (0.35 + 0.9 * o.t);
-  // L'onde est **creuse** : la matière s'écarte du centre au lieu de le
-  // remplir, sinon on retrouve la grosse tache claire que le style proscrit.
-  const petals = groundPetals(ctx, {
-    id: `${o.id}/petals`,
+  const count = Math.max(4, Math.round(o.tongues ?? 7));
+  const radius = o.radius * (0.3 + 0.85 * o.t);
+  const out: Piece[] = [];
+
+  // Poussière soulevée : sombre, basse, tramée. Elle donne l'assise de l'onde
+  // sans rien éclairer.
+  const dust = groundRing(ctx, {
+    id: `${o.id}/dust`,
     centre: { x: o.centre.x, y: o.centre.y, z: 0.02 },
-    radius,
-    count: o.petals ?? 7,
-    inner: radius * 0.52,
-    width: 0.42,
+    radius: radius * 1.02,
+    thickness: Math.max(0.12, o.radius * 0.16),
+    wobble: 0.2,
   });
-  const ring = groundRing(ctx, {
-    id: `${o.id}/ring`,
-    centre: { x: o.centre.x, y: o.centre.y, z: 0.02 },
-    radius: radius * 0.92,
-    thickness: Math.max(0.1, o.radius * 0.12),
-    wobble: 0.18,
-  });
-  // Un décalque au sol se peint **avant** ce qui se tient dessus : posé
-  // par-dessus, et tramé, il perfore la matière et la réduit en poussière.
-  const depth = ctx.depth({ x: o.centre.x, y: o.centre.y, z: 0 }) + (o.depthBias ?? -1);
-  return [
-    groundPiece(`${o.id}/ring`, depth - 0.1, (canvas) => {
-      // Poussière chaude, pas un halo : tramée, sombre, et elle s'éteint vite.
-      paintRole(canvas, ring, getMaterial('fire.scorch'), o.t < 0.5 ? 'body' : 'shadow', {
-        level: 0.45 - 0.25 * o.t,
+  out.push(
+    groundPiece(`${o.id}/dust`, ctx.depth({ x: o.centre.x, y: o.centre.y, z: 0 }) - 1, (canvas) => {
+      paintRole(canvas, dust, getMaterial('fire.scorch'), o.t < 0.5 ? 'body' : 'shadow', {
+        level: 0.5 - 0.3 * o.t,
         matrix: 4,
       });
     }),
-    groundPiece(`${o.id}/petals`, depth, (canvas, c) => {
-      // Ombrage par épaisseur : la pointe d'un pétale est fine donc saturée,
-      // sa racine est large donc claire. Peints à plat, ces mêmes pétales se
-      // lisent comme des feuilles découpées posées sur le sol.
-      paintEmissive(canvas, petals, getMaterial('fire.flame'), {
-        style: c.style,
-        seed: c.seed,
-        core: 2.6,
-        coreRatio: 0.85,
-        turbulence: 0.14,
-        bias: -0.32 * o.t,
-        ceiling: 1 - 0.3 * o.t,
-      });
-    }),
-  ];
+  );
+
+  for (let i = 0; i < count; i++) {
+    const gid = `${o.id}/tongue#${i}`;
+    const angle = ctx.heading + (i / count) * Math.PI * 2 + (ctx.rnd(gid, 1) - 0.5) * 0.3;
+    const r = radius * (0.85 + 0.3 * ctx.rnd(gid, 2));
+    const foot: Vec3 = { x: o.centre.x + Math.cos(angle) * r, y: o.centre.y + Math.sin(angle) * r, z: 0 };
+    // Les langues se couchent vers l'extérieur en s'écartant : l'onde pousse.
+    const outward = ctx.p({ x: foot.x + Math.cos(angle), y: foot.y + Math.sin(angle), z: 0 });
+    const origin = ctx.p(foot);
+    const lean = leanToward(ctx, foot, { x: outward.x - origin.x, y: outward.y - origin.y }) * (0.25 + 0.4 * o.t);
+    // Hauteurs très inégales, et une langue sur cinq qui manque : un anneau
+    // régulier se lit comme une couronne de décoration, pas comme une onde.
+    if (ctx.rnd(gid, 9) < 0.18) continue;
+    const height = o.radius * (0.4 + 0.55 * ctx.rnd(gid, 3) ** 1.6) * (1 - 0.4 * o.t);
+    const body = flameBody(ctx, {
+      id: gid,
+      anchor: foot,
+      height,
+      width: o.radius * 0.3 * (1 - 0.25 * o.t),
+      count: 2,
+      curl: 0.55,
+      phase: 0.3 + 0.5 * o.t + ctx.rnd(gid, 4) * 0.3,
+      lean,
+      seed: ctx.seed,
+    });
+    out.push(
+      emissivePiece(ctx, {
+        id: gid,
+        mask: body.mask,
+        at: foot,
+        material: 'fire.flame',
+        core: 2.2,
+        turbulence: 0.22,
+        bias: -0.3 * o.t,
+        ceiling: 1 - 0.25 * o.t,
+        ...(o.depthBias !== undefined ? { depthBias: o.depthBias } : {}),
+      }),
+    );
+  }
+  return out;
 }
 
 /** Lueur d'ignition au sol : chaude, tramée, elle prévient l'impact. */
@@ -368,42 +388,73 @@ export function mist(ctx: FrameContext, o: FxBase): Piece[] {
 }
 
 /**
- * Nova de gel : des **pointes** qui poussent au sol, plus une couronne nette.
- * La glace cristallise, elle ne souffle pas.
+ * Nova de gel : une **couronne de pointes debout**, qui pousse par paliers.
+ *
+ * Même correction que pour le feu : des triangles couchés au sol se lisent
+ * comme des feuilles, pas comme de la glace. Ce sont maintenant de petits
+ * prismes plantés en cercle, facettés et contournés comme le reste de
+ * l'élément, chacun à sa profondeur.
  */
 export function frostNova(
   ctx: FrameContext,
   o: { id: string; centre: Vec3; t: number; radius: number; spikes?: number; depthBias?: number },
 ): Piece[] {
+  const count = Math.max(4, Math.round(o.spikes ?? 9));
   // Croissance par paliers : quatre marches, comme le reste de l'élément.
   const stepped = Math.ceil(Math.max(0.05, o.t) * 4) / 4;
-  const radius = o.radius * (0.3 + 0.8 * stepped);
-  const spikes = groundSpikes(ctx, {
-    id: `${o.id}/spikes`,
-    centre: { x: o.centre.x, y: o.centre.y, z: 0.02 },
-    radius,
-    count: o.spikes ?? 9,
-    width: 0.4,
-  });
+  const radius = o.radius * (0.35 + 0.75 * stepped);
+  const out: Piece[] = [];
+
   const ring = groundRing(ctx, {
     id: `${o.id}/ring`,
     centre: { x: o.centre.x, y: o.centre.y, z: 0.02 },
-    radius: radius * 0.6,
+    radius: radius * 0.92,
     thickness: Math.max(0.1, o.radius * 0.12),
-    wobble: 0.2,
+    wobble: 0.22,
   });
-  const depth = ctx.depth({ x: o.centre.x, y: o.centre.y, z: 0 }) + (o.depthBias ?? -1);
-  return [
-    groundPiece(`${o.id}/ring`, depth - 0.1, (canvas) => {
-      paintRole(canvas, ring, getMaterial('ice.frost'), 'light', { level: 0.8 - 0.3 * o.t, matrix: 4 });
+  out.push(
+    groundPiece(`${o.id}/ring`, ctx.depth({ x: o.centre.x, y: o.centre.y, z: 0 }) - 1, (canvas) => {
+      paintRole(canvas, ring, getMaterial('ice.frost'), o.t < 0.5 ? 'light' : 'body', {
+        level: 0.7 - 0.3 * o.t,
+        matrix: 4,
+      });
     }),
-    groundPiece(`${o.id}/spikes`, depth, (canvas) => {
-      // La glace garde un ombrage plat : ce sont des plaques, pas des flammes.
-      const material = getMaterial('ice.crystal');
-      paintRole(canvas, spikes, material, o.t < 0.5 ? 'body' : 'shadow');
-      paintRole(canvas, spikes.erode(1), material, o.t < 0.5 ? 'light' : 'body');
-    }),
-  ];
+  );
+
+  for (let i = 0; i < count; i++) {
+    const gid = `${o.id}/spike#${i}`;
+    const angle = ctx.heading + (i / count) * Math.PI * 2 + (ctx.rnd(gid, 1) - 0.5) * 0.35;
+    const r = radius * (0.8 + 0.35 * ctx.rnd(gid, 2));
+    const base: Vec3 = { x: o.centre.x + Math.cos(angle) * r, y: o.centre.y + Math.sin(angle) * r, z: 0 };
+    const lean = 0.35 + 0.3 * ctx.rnd(gid, 3);
+    const axis = norm3({ x: Math.cos(angle) * lean, y: Math.sin(angle) * lean, z: 1 });
+    const length = o.radius * (0.5 + 0.45 * ctx.rnd(gid, 4)) * stepped;
+    const solid = prism({
+      id: gid,
+      seed: ctx.seed,
+      base,
+      axis,
+      length,
+      radius: o.radius * 0.11,
+      sides: 5,
+      irregular: 0.22,
+      taper: 0.5,
+      roll: ctx.rnd(gid, 5) * Math.PI,
+    });
+    out.push({
+      id: gid,
+      depth: ctx.depth(solid.center) + (o.depthBias ?? 0),
+      paint: (canvas, c) => {
+        paintSolidObject(canvas, c, solid, {
+          material: getMaterial('ice.crystal'),
+          rim: 'accent',
+          contact: 'deep',
+          bias: 0.08 * o.t,
+        });
+      },
+    });
+  }
+  return out;
 }
 
 /**
@@ -520,6 +571,106 @@ export function boltNova(
       const material = getMaterial('lightning.bolt');
       paintRole(canvas, branches, material, o.t < 0.4 ? 'light' : 'body');
       paintRole(canvas, branches.erode(1), material, 'accent');
+    }),
+  ];
+}
+
+/**
+ * Éclair de contact : la gerbe blanche de la décharge de retour.
+ *
+ * Ce n'est ni un disque ni une couronne — deux formes que le style refuse —
+ * mais une **étoile brisée** : des dards droits, d'inégale longueur, qui
+ * partent tous du point de contact. Un dard sur trois est cassé en deux
+ * tronçons, ce qui évite la symétrie florale et donne l'irrégularité propre
+ * à une décharge. Les dards sont construits dans le monde puis projetés, si
+ * bien que l'étoile s'aplatit correctement selon le cap.
+ */
+export function boltFlash(
+  ctx: FrameContext,
+  o: { id: string; centre: Vec3; t: number; radius: number; spikes?: number; depthBias?: number },
+): Piece[] {
+  const count = Math.max(5, Math.round(o.spikes ?? 9));
+  // La gerbe s'ouvre vite puis se rétracte : elle ne tient jamais une pose.
+  const open = o.t < 0.35 ? o.t / 0.35 : 1 - (o.t - 0.35) / 0.65;
+  const reach = o.radius * (0.35 + 0.75 * Math.max(0, open));
+  if (reach < 0.05) return [];
+  const paths: Vec3[][] = [];
+  for (let i = 0; i < count; i++) {
+    const gid = `${o.id}#${i}`;
+    // Répartition inégale : un pas régulier plus un décalage propre au dard.
+    const a = ctx.heading + (i / count) * Math.PI * 2 + (ctx.rnd(gid, 1) - 0.5) * 1.1;
+    // Longueurs franchement inégales — l'égalité ferait une fleur.
+    const len = reach * (0.35 + 0.95 * ctx.rnd(gid, 2) ** 1.7);
+    // Les dards du haut montent, ceux du bas rasent le sol.
+    const lift = (ctx.rnd(gid, 3) - 0.25) * 1.3;
+    const dir = norm3({ x: Math.cos(a), y: Math.sin(a), z: lift });
+    const bend = (ctx.rnd(gid, 4) - 0.5) * 0.5;
+    const side = { x: -Math.sin(a), y: Math.cos(a), z: 0 };
+    const mid: Vec3 = {
+      x: o.centre.x + dir.x * len * 0.5 + side.x * len * bend,
+      y: o.centre.y + dir.y * len * 0.5 + side.y * len * bend,
+      z: Math.max(0.02, o.centre.z + dir.z * len * 0.5),
+    };
+    const tip: Vec3 = {
+      x: o.centre.x + dir.x * len,
+      y: o.centre.y + dir.y * len,
+      z: Math.max(0.02, o.centre.z + dir.z * len),
+    };
+    paths.push([o.centre, mid, tip]);
+  }
+  const mask = boltMask(ctx, paths, 2.2 * (0.55 + 0.5 * Math.max(0, open)), 0.85);
+  return [
+    emissivePiece(ctx, {
+      id: `${o.id}/flash`,
+      mask,
+      at: o.centre,
+      material: 'lightning.bolt',
+      core: 1.6,
+      turbulence: 0.06,
+      grain: 2,
+      bias: 0.1,
+      ...(o.depthBias !== undefined ? { depthBias: o.depthBias } : {}),
+    }),
+  ];
+}
+
+/**
+ * Colonne de retour : le canal vertical qui reste allumé une image après le
+ * contact. C'est ce qui donne à la foudre sa **hauteur** — sans lui, une
+ * frappe vue de trois quarts se lit comme un gribouillis posé au sol.
+ */
+export function boltColumn(
+  ctx: FrameContext,
+  o: { id: string; foot: Vec3; height: number; t: number; width?: number; seed?: number },
+): Piece[] {
+  const width = o.width ?? 3;
+  const steps = 5;
+  const path: Vec3[] = [];
+  for (let s = 0; s <= steps; s++) {
+    const k = s / steps;
+    const gid = `${o.id}@${s}`;
+    const wobble = s === 0 ? 0 : (ctx.rnd(gid, 1) - 0.5) * o.height * 0.16;
+    const lateral = s === 0 ? 0 : (ctx.rnd(gid, 2) - 0.5) * o.height * 0.16;
+    path.push({
+      x: o.foot.x + wobble,
+      y: o.foot.y + lateral,
+      z: o.foot.z + o.height * k,
+    });
+  }
+  // La colonne s'éteint par le haut : le sommet disparaît avant le pied.
+  const alive = Math.max(0, 1 - o.t);
+  const mask = boltMask(ctx, [path], width * (0.5 + 0.7 * alive), 0.35);
+  return [
+    emissivePiece(ctx, {
+      id: `${o.id}/column`,
+      mask,
+      at: o.foot,
+      material: 'lightning.bolt',
+      core: Math.max(1.4, width * 0.7),
+      turbulence: 0.08,
+      grain: 2,
+      bias: -0.35 * o.t,
+      ceiling: 1 - 0.3 * o.t,
     }),
   ];
 }

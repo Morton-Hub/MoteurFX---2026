@@ -27,7 +27,7 @@ function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const defs = args['all']
     ? listRecipes()
-    : String(args['recipe'] ?? 'fire-ember-petal-s').split(',').map((id) => getRecipe(id.trim()));
+    : String(args['recipe'] ?? 'fire-ember-fist-s').split(',').map((id) => getRecipe(id.trim()));
   for (const def of defs) {
     const compiled = compileRecipe(def, { probeParams: false });
     const { frames } = renderDirections(compiled, { directions: Number(args['dirs'] ?? 8) });

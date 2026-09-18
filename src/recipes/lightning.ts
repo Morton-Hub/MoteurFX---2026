@@ -19,7 +19,7 @@ import { paintGroundMark } from '../geometry/ground.js';
 import type { FrameContext } from '../renderer/context.js';
 import type { Piece } from '../renderer/piece.js';
 import { groundPiece, motifPiece, piece, scatterMotifs } from './common.js';
-import { arcSparks, boltNova, forwardUp, groundGlow, staticMotes } from './fx.js';
+import { arcSparks, boltColumn, boltFlash, boltNova, forwardUp, groundGlow, staticMotes } from './fx.js';
 import type { ParamBag, ParamSpec } from './params.js';
 import type { SpellBuilder } from './types.js';
 
@@ -139,8 +139,13 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       return out;
     }
     const { path, branches } = strike('main');
-    out.push(boltPiece(ctx, { id: 'main', paths: [path], at: middle, width: width + (i === 3 ? 0.5 : 0) }));
-    out.push(boltPiece(ctx, { id: 'branches', paths: branches, at: middle, width: Math.max(1, width - 1), bias: -0.15 }));
+    out.push(boltPiece(ctx, { id: 'main', paths: [path], at: middle, width: width + (i === 3 ? 1.5 : 0.5) }));
+    out.push(boltPiece(ctx, { id: 'branches', paths: branches, at: middle, width: Math.max(1, width - 0.5), bias: -0.15 }));
+    // La décharge de retour : une colonne verticale au point de contact, puis
+    // la gerbe blanche. C'est le climax du rang S — sans elle, la frappe se
+    // lit comme un fil posé au sol.
+    out.push(...boltColumn(ctx, { id: 'return', foot: { ...ctx.target, z: 0.02 }, height: 1.5, t: i === 3 ? 0 : 0.6, width: width + 1 }));
+    out.push(...boltFlash(ctx, { id: 'flash', centre: hit, t: i === 3 ? 0.25 : 0.7, radius: scorchRadius * 2.6 + 0.6, spikes: 9 }));
     out.push(motifPiece(ctx, { id: 'hand-node', motif: BOLT_NODE, at: hand, frame: 0 }));
     out.push(motifPiece(ctx, { id: 'hit-node', motif: BOLT_NODE, at: hit, frame: i === 3 ? 0 : 1 }));
     // À la connexion, la décharge court au sol et projette des étincelles vers
@@ -170,8 +175,10 @@ function threadBuild(ctx: FrameContext, p: ParamBag): Piece[] {
     const active = k < restrikes * 2;
     if (active && k % 2 === 0) {
       const { path, branches } = strike(`restrike#${k / 2}`);
-      out.push(boltPiece(ctx, { id: 'restrike', paths: [path], at: middle, width, bias: -0.08 }));
-      out.push(boltPiece(ctx, { id: 'restrike-branch', paths: branches, at: middle, width: Math.max(1, width - 1), bias: -0.2 }));
+      out.push(boltPiece(ctx, { id: 'restrike', paths: [path], at: middle, width: width + 0.5, bias: -0.08 }));
+      out.push(boltPiece(ctx, { id: 'restrike-branch', paths: branches, at: middle, width: Math.max(1, width - 0.5), bias: -0.2 }));
+      out.push(...boltColumn(ctx, { id: `return#${k}`, foot: { ...ctx.target, z: 0.02 }, height: 1.1, t: 0.35, width }));
+      out.push(...boltFlash(ctx, { id: `flash#${k}`, centre: hit, t: 0.3, radius: scorchRadius * 2 + 0.4, spikes: 7 }));
       out.push(motifPiece(ctx, { id: 'hit-node', motif: BOLT_NODE, at: hit, frame: 1 }));
       out.push(
         ...arcSparks(ctx, { id: 'restrike-spark', at: hit, t: 0.15, count: 9, scale: 0.8, dir: forwardUp(ctx, 0.7), spread: 1.4 }),
@@ -354,6 +361,27 @@ function ricochetBuild(ctx: FrameContext, p: ParamBag): Piece[] {
         }),
       );
       if (age === 0) {
+        // Chaque saut frais a sa décharge de retour et sa gerbe : c'est ce qui
+        // fait qu'un ricochet se lit comme trois coups portés, et non comme un
+        // trait qui glisse d'une cible à l'autre.
+        out.push(
+          ...boltColumn(ctx, {
+            id: `return#${k}`,
+            foot: { x: to.x, y: to.y, z: 0.02 },
+            height: fresh ? 1.3 : 0.9,
+            t: fresh ? 0.1 : 0.55,
+            width: width + 0.5,
+          }),
+        );
+        out.push(
+          ...boltFlash(ctx, {
+            id: `flash#${k}`,
+            centre: to,
+            t: fresh ? 0.22 : 0.65,
+            radius: hopSpread * 0.9,
+            spikes: 8,
+          }),
+        );
         out.push(
           ...arcSparks(ctx, {
             id: `hop-spark#${k}`,
@@ -541,6 +569,18 @@ function crownBuild(ctx: FrameContext, p: ParamBag): Piece[] {
       out.push(boltPiece(ctx, { id: 'strike-forks', paths: forks, at: middle, width: Math.max(1, width - 1.5), bias: -0.15 }));
     }
     out.push(motifPiece(ctx, { id: 'impact-node', motif: BOLT_NODE, at: { ...ground, z: 0.15 }, frame: hold === 0 ? 0 : 1, scale: 2 }));
+    // La gerbe de contact : le pied de la colonne explose en dards inégaux.
+    // C'est elle qui donne son poids au rang L — la colonne seule est une
+    // ligne, et une ligne ne fait pas un impact.
+    out.push(
+      ...boltFlash(ctx, {
+        id: 'flash',
+        centre: { ...ground, z: 0.12 },
+        t: i === 3 ? 0.2 : i === 4 ? 0.5 : 0.85,
+        radius: scorchRadius * 1.6,
+        spikes: branchCount + 6,
+      }),
+    );
     out.push(
       ...boltNova(ctx, {
         id: 'nova',

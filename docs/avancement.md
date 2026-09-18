@@ -52,6 +52,39 @@ préférences :
 | Objets découpés par les décalques au sol | Le tri par profondeur ne peut pas exprimer « toujours sous ce qui se tient dessus » | Deux plans de peinture : sol, puis scène — 65 pixels isolés ramenés à 29 |
 | Sprites qui débordaient du canevas | Les gerbes portent plus loin que les masses | Scènes de capture agrandies, portée des gerbes plafonnée, zéro débordement sur 16 caps |
 
+## Passe « plus de feuilles »
+
+Après relecture, la première refonte gardait des formes végétales : les novas
+posaient des polygones **couchés au sol**, et l'éclatement du feu s'ouvrait en
+trois lobes symétriques autour d'un cœur. À cette taille, les deux se lisent
+comme une fleur ou une feuille découpée, jamais comme de la matière. Cette
+passe les remplace par des volumes debout et supprime le code fautif.
+
+| Ancienne forme | Pourquoi elle échouait | Nouvelle forme |
+|---|---|---|
+| `groundPetals`, `groundSpikes` — couronnes de polygones à plat | Un polygone couché n'a pas d'épaisseur à ombrer : il se lit comme du papier posé sur le décor, à l'identique dans les huit caps | Couronnes de volumes **debout** : langues de flamme (feu), prismes (glace), chacune à sa propre profondeur |
+| `openLobes` — trois pétales symétriques autour d'un cœur | Trois lobes de longueur voisine forment une fleur, ou un papillon de trois quarts | Gerbe montante (`flameBody`) : verticale, asymétrique, langues de hauteurs inégales |
+| « Pétale de braise » (nom et paramètres du rang S) | Le vocabulaire floral décrivait encore l'ancienne forme | « Poing de braise » ; `tongues` remplace `petals` |
+
+Les trois fonctions ont été **retirées**, pas seulement débranchées : le
+fichier garde à leur place une note expliquant pourquoi, pour qu'elles ne
+reviennent pas.
+
+La foudre, elle, n'avait pas de problème de feuille mais manquait de poids :
+elle se lisait comme un gribouillis fin posé au sol. Deux effets l'ont
+corrigée, tous deux construits dans le monde puis projetés, donc différents
+selon le cap :
+
+- `boltFlash` — l'**étoile brisée** du contact : des dards droits, d'inégale
+  longueur, partant tous du point de frappe, qui s'ouvrent puis se rétractent
+  en trois images. L'irrégularité des longueurs est ce qui l'empêche de
+  redevenir une fleur ;
+- `boltColumn` — la **décharge de retour** : le canal vertical tenu une image
+  après le contact, qui s'éteint par le haut. C'est lui qui donne sa hauteur à
+  une frappe vue de trois quarts.
+
+Les canaux principaux ont aussi été épaissis au moment de la connexion.
+
 ## Contrôles automatiques en place
 
 75 tests, dont ceux qui gardent les promesses du document :
@@ -75,7 +108,7 @@ préférences :
 ## Prochaine action précise
 
 Exécuter l'importeur Unity sur un projet réel avec le pack
-`fire-ember-petal-s` en huit caps, vérifier la conversion de repère des pivots
+`fire-ember-fist-s` en huit caps, vérifier la conversion de repère des pivots
 (l'atlas compte les Y depuis le haut, Unity depuis le bas), puis monter la
 scène de démonstration qui montre le même sort à plusieurs distances et
 plusieurs caps.

@@ -120,7 +120,7 @@ image complète, huit caps exportés :
 | Pilier du dragon | 1,8 |
 | Cathédrale boréale | 1,9 |
 | Cœur de comète | 2,3 |
-| Pétale de braise | 4,1 |
+| Poing de braise | 4,1 |
 
 Un clip de douze images coûte donc entre 8 et 50 ms, et un export huit caps
 entre 70 et 400 ms hors encodage PNG. Ces chiffres valent pour cette machine ;

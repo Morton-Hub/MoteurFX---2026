@@ -10,7 +10,7 @@ sort et par direction, trois rangs S / M / L par élément**.
 
 | Famille | S | M | L |
 |---|---|---|---|
-| **Braise** (feu) | Pétale de braise — masse lancée, ouverture en pétales | Pilier du dragon — colonne qui jaillit du sol et se déchire | Cœur de comète — masse rocheuse venue du ciel, impact lourd |
+| **Braise** (feu) | Poing de braise — masse lancée, éclatement en gerbe montante | Pilier du dragon — colonne qui jaillit du sol et se déchire | Cœur de comète — masse rocheuse venue du ciel, impact lourd |
 | **Aurore** (glace) | Aiguille d'aurore — prisme rigide, rupture nette | Jardin de givre — couronne de prismes qui pousse par paliers | Cathédrale boréale — front de gel et nervures levées |
 | **Orage** (foudre) | Fil d'orage — une couture entre deux attaches, avec reprise | Ricochet ionique — trois sauts, trois nœuds, trois coupures | Couronne du tonnerre — frappe verticale et branches au sol |
 

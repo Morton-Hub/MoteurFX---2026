@@ -20,7 +20,7 @@ Ce dossier contient le code d'intégration du pack MOTORFX2 dans Unity.
 ## Marche à suivre
 
 1. Exporter un pack depuis le CLI ou l'atelier :
-   `npx tsx src/cli/render.ts --recipe fire-ember-petal-s --dirs 8 --out out`
+   `npx tsx src/cli/render.ts --recipe fire-ember-fist-s --dirs 8 --out out`
 2. Copier le dossier du sort (`<id>-body.png`, `<id>-emission.png`,
    `<id>.manifest.json`) dans `Assets/` du projet Unity.
 3. Menu **MOTORFX2 ▸ Importer un pack…**, choisir le `.manifest.json`.

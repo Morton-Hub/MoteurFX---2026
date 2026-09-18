@@ -2,15 +2,15 @@
 
 ## Ce que produit un export
 
-Pour `--recipe fire-ember-petal-s --dirs 8` :
+Pour `--recipe fire-ember-fist-s --dirs 8` :
 
 ```text
-out/fire-ember-petal-s/
-  fire-ember-petal-s-body.png        atlas du corps, 8 lignes × 12 colonnes
-  fire-ember-petal-s-emission.png    même grille, passe lumineuse
-  fire-ember-petal-s.manifest.json   le contrat de lecture
+out/fire-ember-fist-s/
+  fire-ember-fist-s-body.png        atlas du corps, 8 lignes × 12 colonnes
+  fire-ember-fist-s-emission.png    même grille, passe lumineuse
+  fire-ember-fist-s.manifest.json   le contrat de lecture
   frames/d00-f00.png …               images séparées, avec --frames
-  fire-ember-petal-s-apercu.gif      animation de contrôle, avec --preview
+  fire-ember-fist-s-apercu.gif      animation de contrôle, avec --preview
 ```
 
 L'aperçu GIF **n'est pas un asset livrable** : c'est un contrôle de rythme.
